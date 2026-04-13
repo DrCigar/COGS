@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS Supply Chain // COGS Command Center</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@300;400;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#060a12;--bg2:#0d1320;--bg3:#141d2f;--bg4:#1a2540;
+    --green:#00ff88;--red:#ff3366;--cyan:#00e5ff;--yellow:#ffd000;
+    --purple:#a855f7;--orange:#ff8c00;--pink:#ff6eb4;--blue:#3b82f6;
+    --border:#1a2744;--text:#e2e8f0;--muted:#7a8fa8;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;overflow-x:hidden;--font-scale:1}
+  body.kiosk *{font-size-adjust:none}
+  body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.015) 3px,rgba(0,0,0,0.015) 4px);pointer-events:none;z-index:9999}
+
+  /* ---- UPLOAD OVERLAY ---- */
+  .upload-overlay{position:fixed;inset:0;z-index:10000;background:rgba(6,10,18,0.97);display:flex;align-items:center;justify-content:center;transition:opacity .4s}
+  .upload-overlay.hidden{opacity:0;pointer-events:none}
+  .upload-box{max-width:720px;width:90%;text-align:center}
+  .upload-box h1{font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:3px;margin-bottom:10px}
+  .upload-box .sub{color:var(--muted);font-size:14px;margin-bottom:32px;line-height:1.7}
+  .drop-zone{border:2px dashed var(--border);border-radius:16px;padding:60px 40px;cursor:pointer;transition:all .3s;background:var(--bg2);position:relative}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--cyan);background:rgba(0,229,255,0.04);box-shadow:0 0 40px rgba(0,229,255,0.08)}
+  .drop-zone .dz-icon{font-size:48px;margin-bottom:16px;opacity:.7}
+  .drop-zone .dz-text{font-size:16px;font-weight:600;margin-bottom:8px}
+  .drop-zone .dz-hint{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .upload-or{color:var(--muted);margin:24px 0;font-size:13px}
+  .skip-btn{padding:10px 28px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:13px;cursor:pointer;transition:all .2s}
+  .skip-btn:hover{border-color:var(--cyan);background:rgba(0,229,255,.08);box-shadow:0 0 16px rgba(0,229,255,.12)}
+  .csv-format{text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-top:28px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.8;color:var(--muted)}
+  .csv-format strong{color:var(--text)}
+  .csv-format code{background:var(--bg3);padding:2px 6px;border-radius:4px;color:var(--cyan);font-size:11px}
+
+  /* Processing animation */
+  .processing{display:none;text-align:center;padding:40px}
+  .processing.active{display:block}
+  .processing h2{font-family:'Orbitron',sans-serif;font-size:18px;color:var(--cyan);margin-bottom:16px;letter-spacing:2px}
+  .proc-bar{height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;max-width:400px;margin:0 auto 16px}
+  .proc-bar .fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));border-radius:2px;animation:procAnim 2s ease-in-out infinite}
+  @keyframes procAnim{0%{width:0}50%{width:80%}100%{width:100%}}
+  .proc-log{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);max-height:200px;overflow-y:auto;text-align:left;max-width:500px;margin:0 auto}
+  .proc-log div{padding:3px 0;border-bottom:1px solid rgba(26,39,68,.3)}
+  .proc-log .match{color:var(--green)}
+  .proc-log .skip{color:var(--muted);opacity:.5}
+
+  /* Product summary bar */
+  .product-bar{display:flex;gap:0;border-bottom:1px solid var(--border);overflow-x:auto;background:var(--bg3)}
+  .product-bar::-webkit-scrollbar{height:4px}.product-bar::-webkit-scrollbar-thumb{background:var(--border)}
+  .prod-chip{flex:0 0 auto;padding:10px 18px;border-right:1px solid var(--border);cursor:pointer;transition:all .2s;position:relative}
+  .prod-chip:hover{background:var(--bg4)}
+  .prod-chip.active{background:var(--bg4);box-shadow:inset 0 -2px 0 var(--cyan)}
+  .prod-chip .prod-name{font-size:11px;font-weight:600;margin-bottom:2px;white-space:nowrap}
+  .prod-chip .prod-count{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cyan)}
+  .prod-chip .prod-risk{position:absolute;top:4px;right:6px;width:8px;height:8px;border-radius:50%}
+  .prod-chip .prod-risk.high{background:var(--red);box-shadow:0 0 6px var(--red)}
+  .prod-chip .prod-risk.med{background:var(--yellow);box-shadow:0 0 6px var(--yellow)}
+  .prod-chip .prod-risk.low{background:var(--green);box-shadow:0 0 6px var(--green)}
+
+  /* Reload CSV btn */
+  .reload-csv{padding:5px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .2s;margin-left:auto}
+  .reload-csv:hover{border-color:var(--cyan);color:var(--cyan)}
+
+  /* TICKER */
+  .ticker-wrap{background:linear-gradient(90deg,#0a0f1a,#111b2e,#0a0f1a);border-bottom:1px solid var(--border);overflow:hidden;height:40px;position:relative}
+  .ticker-wrap::before,.ticker-wrap::after{content:'';position:absolute;top:0;bottom:0;width:60px;z-index:2;pointer-events:none}
+  .ticker-wrap::before{left:0;background:linear-gradient(90deg,#0a0f1a,transparent)}
+  .ticker-wrap::after{right:0;background:linear-gradient(90deg,transparent,#0a0f1a)}
+  .ticker-track{display:flex;align-items:center;height:100%;animation:scrollTicker 180s linear infinite;width:max-content}
+  @keyframes scrollTicker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  .ticker-item{display:flex;align-items:center;gap:6px;padding:0 12px;white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:12px;border-right:1px solid var(--border)}
+  .ticker-item .sym{font-weight:700;color:var(--cyan);min-width:40px}
+  .ticker-item .change{font-weight:700;min-width:70px;text-align:right}
+  .ticker-item .change.up{color:var(--red)}.ticker-item .change.down{color:var(--green)}
+
+  /* HEADER */
+  .header{padding:18px 28px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(0,229,255,0.02),transparent)}
+  .header-left h1{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:900;background:linear-gradient(135deg,var(--cyan),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:3px}
+  .header-left .sub{font-size:11px;color:var(--muted);margin-top:3px;font-family:'JetBrains Mono',monospace}
+  .header-right{display:flex;align-items:center;gap:20px}
+  .live-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse-dot 1.5s ease-in-out infinite;box-shadow:0 0 10px var(--green)}
+  @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.7)}}
+  .clock{font-family:'Orbitron',sans-serif;font-size:16px;color:var(--cyan);text-shadow:0 0 16px rgba(0,229,255,0.3)}
+  .market-status{font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 12px;border-radius:12px;letter-spacing:1px}
+  .market-status.open{background:rgba(0,255,136,0.12);color:var(--green);border:1px solid rgba(0,255,136,0.3)}
+
+  /* SCORE BAR */
+  .score-bar{display:flex;border-bottom:1px solid var(--border)}
+  .score-card{flex:1;padding:14px 20px;border-right:1px solid var(--border);background:var(--bg2);position:relative;overflow:hidden}
+  .score-card:last-child{border-right:none}
+  .score-card .label{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:4px}
+  .score-card .value{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:700}
+  .score-card .detail{font-size:10px;margin-top:3px;font-family:'JetBrains Mono',monospace;color:var(--muted)}
+  .score-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px}
+  .score-card.green .value{color:var(--green)}.score-card.green::after{background:var(--green);box-shadow:0 0 10px var(--green)}
+  .score-card.red .value{color:var(--red)}.score-card.red::after{background:var(--red);box-shadow:0 0 10px var(--red)}
+  .score-card.cyan .value{color:var(--cyan)}.score-card.cyan::after{background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+  .score-card.yellow .value{color:var(--yellow)}.score-card.yellow::after{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+  .score-card.purple .value{color:var(--purple)}.score-card.purple::after{background:var(--purple);box-shadow:0 0 10px var(--purple)}
+  .score-card.orange .value{color:var(--orange)}.score-card.orange::after{background:var(--orange);box-shadow:0 0 10px var(--orange)}
+
+  /* FILTER BAR */
+  .filter-bar{display:flex;align-items:center;gap:8px;padding:10px 28px;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
+  .filter-btn{padding:5px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .2s}
+  .filter-btn:hover{border-color:var(--cyan);color:var(--text)}
+  .filter-btn.active{background:rgba(0,229,255,0.1);border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 10px rgba(0,229,255,0.12)}
+  .filter-label{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-right:8px}
+
+  /* MAIN GRID */
+  .main{display:grid;grid-template-columns:1fr 340px;min-height:calc(100vh - 300px)}
+  .dashboard-wrap{display:none}
+  .dashboard-wrap.active{display:block}
+
+  /* CARDS */
+  .cards-area{padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-content:start;background-image:linear-gradient(rgba(0,229,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.015) 1px,transparent 1px);background-size:32px 32px}
+  .material-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;overflow:hidden;transition:all .3s;cursor:pointer}
+  .material-card:hover{border-color:var(--cyan);transform:translateY(-1px);box-shadow:0 6px 24px rgba(0,0,0,.4),0 0 16px rgba(0,229,255,.06)}
+  .material-card.flash-green{animation:flashG .5s ease}
+  .material-card.flash-red{animation:flashR .5s ease}
+  @keyframes flashG{0%{box-shadow:0 0 30px rgba(0,255,136,.25)}100%{box-shadow:none}}
+  @keyframes flashR{0%{box-shadow:0 0 30px rgba(255,51,102,.25)}100%{box-shadow:none}}
+  .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+  .card-symbol{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:var(--cyan)}
+  .card-name{font-size:11px;color:var(--muted);margin-top:1px}
+  .card-badge{padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+  .card-badge.memory{background:rgba(168,85,247,0.15);color:var(--purple)}
+  .card-badge.metals{background:rgba(0,229,255,0.15);color:var(--cyan)}
+  .card-badge.plastics{background:rgba(255,140,0,0.15);color:var(--orange)}
+  .card-badge.displays{background:rgba(255,110,180,0.15);color:var(--pink)}
+  .card-badge.payment{background:rgba(0,255,136,0.15);color:var(--green)}
+  .card-badge.semicon{background:rgba(255,208,0,0.15);color:var(--yellow)}
+  .card-badge.thermal{background:rgba(59,130,246,0.15);color:var(--blue)}
+  .card-badge.networking{background:rgba(0,229,255,0.15);color:var(--cyan)}
+  .card-badge.power{background:rgba(255,140,0,0.15);color:var(--orange)}
+  .card-price-row{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .card-price{font-family:'Orbitron',sans-serif;font-size:24px;font-weight:700}
+  .card-unit{font-size:10px;color:var(--muted)}
+  .card-change{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;padding:2px 7px;border-radius:5px}
+  .card-change.up{color:var(--red);background:rgba(255,51,102,.08)}
+  .card-change.down{color:var(--green);background:rgba(0,255,136,.08)}
+  .card-chart{height:50px;margin:10px -4px 6px;position:relative}
+  .card-chart canvas{width:100%;height:100%}
+  .card-footer{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .card-source{opacity:.6;font-size:9px}
+  .card-trend{display:flex;align-items:center;gap:4px;font-weight:700}
+  .card-trend.up{color:var(--red)}.card-trend.down{color:var(--green)}.card-trend.stable{color:var(--muted)}
+  .card-products{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px}
+  .card-prod-tag{font-size:9px;padding:2px 6px;border-radius:8px;background:rgba(0,229,255,0.06);border:1px solid var(--border);color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .rank-badge{position:absolute;top:-1px;right:16px;padding:2px 8px 5px;font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;border-radius:0 0 6px 6px;letter-spacing:1px}
+  .rank-badge.critical{background:var(--red);color:#fff}
+  .rank-badge.watch{background:var(--yellow);color:#000}
+
+  /* SIDEBAR */
+  .sidebar{border-left:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow:hidden}
+  .sidebar-section{padding:16px;border-bottom:1px solid var(--border)}
+  .sidebar-title{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;color:var(--cyan);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .leader-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(26,39,68,.5);font-size:12px}
+  .leader-row:last-child{border:none}
+  .leader-rank{width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:5px;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700}
+  .leader-rank.gold{background:rgba(255,208,0,.2);color:var(--yellow)}
+  .leader-rank.silver{background:rgba(148,163,184,.2);color:#94a3b8}
+  .leader-rank.bronze{background:rgba(255,140,0,.2);color:var(--orange)}
+  .leader-rank.normal{background:rgba(30,41,59,.5);color:var(--muted)}
+  .leader-name{flex:1;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px}
+  .leader-impact{font-size:9px;color:var(--muted)}
+  .leader-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px}
+  .risk-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .risk-cell{padding:10px;border-radius:8px;background:var(--bg);border:1px solid var(--border)}
+  .risk-cell .r-label{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px}
+  .risk-cell .r-value{font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700}
+  .risk-cell .r-bar{height:4px;border-radius:2px;margin-top:6px;background:var(--bg3);overflow:hidden}
+  .risk-cell .r-fill{height:100%;border-radius:2px;transition:width .5s}
+  .alert-feed{flex:1;overflow-y:auto;padding:16px}
+  .alert-feed::-webkit-scrollbar{width:3px}.alert-feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+  .alert-item{padding:10px;border-radius:6px;margin-bottom:8px;font-size:11px;line-height:1.5;border-left:3px solid;animation:slideIn .3s ease}
+  @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+  .alert-item.critical{background:rgba(255,51,102,.06);border-color:var(--red)}
+  .alert-item.opportunity{background:rgba(0,255,136,.06);border-color:var(--green)}
+  .alert-item.info{background:rgba(0,229,255,.06);border-color:var(--cyan)}
+  .alert-item.warning{background:rgba(255,208,0,.06);border-color:var(--yellow)}
+  .alert-time{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-bottom:3px}
+  .alert-text{color:var(--text)}.alert-text strong{color:var(--cyan)}
+
+  .sources-bar{padding:8px 28px;border-top:1px solid var(--border);background:var(--bg);font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;display:flex;gap:20px;flex-wrap:wrap}
+  .sources-bar a{color:var(--cyan);opacity:.6;text-decoration:none}.sources-bar a:hover{opacity:1}
+
+  /* RAMAGEDDON */
+  .ramageddon{border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(168,85,247,0.06),rgba(255,51,102,0.03),transparent);padding:0;overflow:hidden;position:relative}
+  .ramageddon::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--purple),var(--red),var(--purple));box-shadow:0 0 16px var(--red)}
+  .rama-header{display:flex;align-items:center;gap:16px;padding:14px 28px 0}
+  .rama-title{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;color:var(--red);letter-spacing:4px;text-shadow:0 0 20px rgba(255,51,102,0.4);animation:ramaFlicker 3s ease-in-out infinite}
+  @keyframes ramaFlicker{0%,100%{opacity:1;text-shadow:0 0 20px rgba(255,51,102,0.4)}50%{opacity:.85;text-shadow:0 0 30px rgba(255,51,102,0.6),0 0 60px rgba(168,85,247,0.3)}}
+  .rama-subtitle{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)}
+  .rama-badge{margin-left:auto;padding:4px 14px;border-radius:12px;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:2px;animation:ramaPulse 2s ease-in-out infinite}
+  .rama-badge.extreme{background:rgba(255,51,102,0.2);color:var(--red);border:1px solid rgba(255,51,102,0.4)}
+  @keyframes ramaPulse{0%,100%{box-shadow:0 0 8px rgba(255,51,102,0.2)}50%{box-shadow:0 0 20px rgba(255,51,102,0.5)}}
+  .rama-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:12px 28px 16px}
+  .rama-card{background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.15);border-radius:8px;padding:12px;position:relative;overflow:hidden}
+  .rama-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--purple),transparent)}
+  .rama-card .rc-sym{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--purple)}
+  .rama-card .rc-name{font-size:10px;color:var(--muted);margin-bottom:6px}
+  .rama-card .rc-price{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;color:var(--red)}
+  .rama-card .rc-yoy{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--red);margin-left:8px}
+  .rama-card .rc-row{display:flex;align-items:baseline;gap:6px}
+  .rama-card .rc-note{font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;font-family:'JetBrains Mono',monospace}
+  .rama-card .rc-chart{height:32px;margin:6px -4px 0}
+  .rama-card .rc-chart canvas{width:100%;height:100%}
+  .rama-news{padding:6px 28px 14px;display:flex;gap:12px;overflow-x:auto}
+  .rama-news::-webkit-scrollbar{height:0}
+  .rama-news-item{flex:0 0 auto;padding:6px 12px;border-radius:6px;background:rgba(255,51,102,0.06);border:1px solid rgba(255,51,102,0.12);font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);white-space:nowrap}
+  .rama-news-item strong{color:var(--red)}
+
+  /* MASTER CHART */
+  .master-chart-section{border-bottom:1px solid var(--border);padding:16px 28px;background:var(--bg2)}
+  .master-chart-title{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;color:var(--cyan);margin-bottom:14px}
+  .master-chart{display:flex;align-items:flex-end;gap:10px;height:160px;padding-bottom:30px;position:relative}
+  .master-chart .mc-zero{position:absolute;bottom:24px;left:0;right:0;height:1px;background:rgba(255,255,255,0.08)}
+  .master-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;position:relative}
+  .master-bar{width:100%;max-width:64px;border-radius:4px 4px 0 0;transition:height .5s;position:relative;min-height:2px;cursor:pointer}
+  .master-bar:hover{filter:brightness(1.3)}
+  .master-bar .mb-val{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;white-space:nowrap}
+  .master-bar-label{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);opacity:.75;margin-top:8px;text-align:center;white-space:normal;line-height:1.3;max-width:90px}
+  .master-bar.negative{border-radius:0 0 4px 4px;align-self:flex-start}
+
+  /* OUTLOOK / OPTIMISM METER */
+  .outlook-section{border-bottom:1px solid var(--border);padding:16px 28px;background:linear-gradient(180deg,rgba(0,229,255,0.02),transparent)}
+  .outlook-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .outlook-title{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;color:var(--cyan)}
+  .outlook-legend{margin-left:auto;display:flex;gap:16px;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted)}
+  .outlook-legend span{display:flex;align-items:center;gap:4px}
+  .outlook-legend .dot{width:8px;height:8px;border-radius:50%}
+  .outlook-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+  .outlook-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+  .outlook-card:hover{border-color:var(--cyan);box-shadow:0 4px 20px rgba(0,0,0,.3)}
+  .outlook-card.editing{border-color:var(--yellow);box-shadow:0 0 20px rgba(255,208,0,0.1)}
+  .oc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .oc-cat{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700}
+  .oc-sentiment-label{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 10px;border-radius:10px}
+  .oc-sentiment-label.very-bullish{background:rgba(0,255,136,0.15);color:var(--green)}
+  .oc-sentiment-label.bullish{background:rgba(0,255,136,0.1);color:#66ffaa}
+  .oc-sentiment-label.neutral{background:rgba(100,100,100,0.15);color:var(--muted)}
+  .oc-sentiment-label.bearish{background:rgba(255,208,0,0.12);color:var(--yellow)}
+  .oc-sentiment-label.very-bearish{background:rgba(255,51,102,0.12);color:var(--red)}
+
+  /* Gauge */
+  .oc-gauge{height:8px;background:var(--bg);border-radius:4px;margin-bottom:8px;position:relative;overflow:visible}
+  .oc-gauge-track{position:absolute;inset:0;border-radius:4px;background:linear-gradient(90deg,var(--red),var(--yellow),#888,#66ffaa,var(--green))}
+  .oc-gauge-marker{position:absolute;top:-4px;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--bg);box-shadow:0 0 8px rgba(255,255,255,0.4);transition:left .4s ease;z-index:2}
+  .oc-gauge-labels{display:flex;justify-content:space-between;font-size:8px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:4px}
+
+  .oc-intel{font-size:10px;color:var(--muted);line-height:1.5;font-family:'JetBrains Mono',monospace;margin-bottom:8px;min-height:30px}
+  .oc-intel strong{color:var(--text)}
+  .oc-meta{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace}
+  .oc-edit-hint{color:var(--cyan);opacity:.5;font-size:9px}
+  .oc-yoy-vs{display:flex;align-items:center;gap:8px}
+  .oc-arrow{font-size:14px}
+
+  /* Edit mode overlay on card */
+  .oc-editor{display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .outlook-card.editing .oc-editor{display:block}
+  .outlook-card.editing .oc-edit-hint{display:none}
+  .oc-slider-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .oc-slider-row label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);min-width:60px}
+  .oc-slider{-webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--red),var(--yellow),#888,#66ffaa,var(--green));outline:none;cursor:pointer}
+  .oc-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--cyan);cursor:pointer;box-shadow:0 0 8px rgba(0,229,255,0.4)}
+  .oc-note-input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;resize:vertical;min-height:48px;margin-top:6px}
+  .oc-note-input:focus{outline:none;border-color:var(--cyan)}
+  .oc-note-input::placeholder{color:var(--muted);opacity:.5}
+  .oc-save-btn{margin-top:8px;padding:6px 16px;border-radius:8px;border:1px solid var(--green);background:rgba(0,255,136,0.08);color:var(--green);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .2s}
+  .oc-save-btn:hover{background:rgba(0,255,136,0.15);box-shadow:0 0 12px rgba(0,255,136,0.15)}
+
+  /* SETTINGS BUTTON */
+  .settings-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:1px;transition:all .2s;display:flex;align-items:center;justify-content:center;line-height:1}
+  .settings-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+
+  /* Settings panel */
+  .settings-panel{position:fixed;top:0;right:-380px;width:380px;height:100vh;background:var(--bg2);border-left:1px solid var(--border);z-index:10001;transition:right .3s ease;box-shadow:-8px 0 32px rgba(0,0,0,.5);display:flex;flex-direction:column}
+  .settings-panel.open{right:0}
+  .settings-panel-header{padding:20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .settings-panel-header h2{font-family:'Orbitron',sans-serif;font-size:14px;color:var(--cyan);letter-spacing:2px}
+  .settings-close{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--muted);cursor:pointer;font-size:16px;transition:all .2s}
+  .settings-close:hover{border-color:var(--red);color:var(--red)}
+  .settings-body{flex:1;overflow-y:auto;padding:20px}
+  .settings-body::-webkit-scrollbar{width:3px}.settings-body::-webkit-scrollbar-thumb{background:var(--border)}
+  .settings-group{margin-bottom:24px}
+  .settings-group-title{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;color:var(--cyan);margin-bottom:12px}
+  .settings-option{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(26,39,68,.4)}
+  .settings-option:last-child{border:none}
+  .settings-option .so-label{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text)}
+  .settings-option .so-desc{font-size:10px;color:var(--muted);margin-top:2px}
+  .kiosk-toggle{position:relative;width:52px;height:28px;cursor:pointer}
+  .kiosk-toggle input{opacity:0;width:0;height:0}
+  .kiosk-toggle .slider{position:absolute;inset:0;background:var(--bg);border:1px solid var(--border);border-radius:14px;transition:all .3s}
+  .kiosk-toggle .slider::before{content:'';position:absolute;width:22px;height:22px;border-radius:50%;background:var(--muted);top:2px;left:2px;transition:all .3s}
+  .kiosk-toggle input:checked+.slider{background:rgba(0,255,136,0.15);border-color:var(--green)}
+  .kiosk-toggle input:checked+.slider::before{transform:translateX(24px);background:var(--green);box-shadow:0 0 8px var(--green)}
+  .settings-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;opacity:0;pointer-events:none;transition:opacity .3s}
+  .settings-overlay.open{opacity:1;pointer-events:auto}
+
+  /* ============ KIOSK MODE — SINGLE VIEWPORT TV LAYOUT ============ */
+  body.kiosk{height:100vh;overflow:hidden;margin:0;padding:0}
+  body.kiosk .dashboard-wrap{height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+  /* Hide everything non-essential */
+  body.kiosk .upload-overlay{display:none}
+  body.kiosk .filter-bar{display:none}
+  body.kiosk .product-bar{display:none}
+  body.kiosk .sidebar{display:none}
+  body.kiosk .sources-bar{display:none}
+  body.kiosk .main{display:none}
+  body.kiosk .reload-csv{display:none}
+  body.kiosk .settings-btn{display:none}
+  body.kiosk #exportBtn{display:none}
+  body.kiosk .outlook-section .oc-editor{display:none !important}
+  body.kiosk .outlook-section .oc-edit-hint{display:none}
+  body.kiosk .outlook-section .oc-intel{display:none}
+  body.kiosk .outlook-section .oc-meta{display:none}
+  body.kiosk .outlook-header .outlook-legend{display:none}
+
+  /* Ticker — compact strip */
+  body.kiosk .ticker-wrap{height:38px;flex-shrink:0}
+  body.kiosk .ticker-item{font-size:13px;padding:0 16px}
+  body.kiosk .ticker-item .sym{font-size:13px}
+
+  /* Header — slim single row */
+  body.kiosk .header{padding:6px 24px;flex-shrink:0}
+  body.kiosk .header-left h1{font-size:22px}
+  body.kiosk .header .sub{display:none}
+  body.kiosk .clock{font-size:20px}
+
+  /* RAMAGEDDON — condensed single row */
+  body.kiosk .ramageddon{flex-shrink:0;padding:8px 24px !important}
+  body.kiosk .rama-title{font-size:16px;margin-bottom:6px}
+  body.kiosk .rama-grid{gap:8px}
+  body.kiosk .rama-card{padding:8px 12px}
+  body.kiosk .rama-card .rc-price{font-size:16px}
+  body.kiosk .rama-card .rc-yoy{font-size:11px}
+  body.kiosk .rama-card .rc-name{font-size:9px}
+  body.kiosk .rama-card canvas{display:none}
+  body.kiosk .rama-card .rc-note{display:none}
+
+  /* Score bar — compact */
+  body.kiosk .score-bar{flex-shrink:0;padding:6px 24px;gap:8px}
+  body.kiosk .score-card{padding:8px 16px}
+  body.kiosk .score-card .value{font-size:22px}
+  body.kiosk .score-card .label{font-size:9px}
+
+  /* Master chart — takes available space */
+  body.kiosk .master-chart-section{flex:1;min-height:0;overflow:hidden;padding:10px 24px 6px !important;display:flex !important;flex-direction:column}
+  body.kiosk .master-chart-title{font-size:12px;flex-shrink:0;margin-bottom:8px}
+  body.kiosk .master-chart{flex:1;min-height:0;height:auto !important;gap:12px;padding-top:28px;padding-bottom:28px}
+  body.kiosk .master-bar{max-width:100px;border-radius:6px 6px 0 0}
+  body.kiosk .master-bar .mb-val{font-size:16px;font-weight:700;top:-26px}
+  body.kiosk .master-bar-label{font-size:13px;max-width:120px;white-space:normal;line-height:1.3;margin-top:10px;color:var(--text);opacity:.85}
+  body.kiosk .master-bar.negative{border-radius:0 0 6px 6px}
+
+  /* Outlook meters — single compact row */
+  body.kiosk .outlook-section{flex-shrink:0;padding:8px 24px 10px !important}
+  body.kiosk .outlook-header{margin-bottom:6px}
+  body.kiosk .outlook-header h2{font-size:11px}
+  body.kiosk .outlook-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px}
+  body.kiosk .outlook-card{padding:6px 10px}
+  body.kiosk .oc-top{margin-bottom:6px}
+  body.kiosk .oc-cat{font-size:10px}
+  body.kiosk .oc-sentiment-label{font-size:8px;padding:2px 6px}
+  body.kiosk .oc-gauge{height:6px;margin-bottom:0}
+  body.kiosk .oc-gauge-marker{width:14px;height:14px;top:-5px}
+  body.kiosk .oc-gauge-labels{display:none}
+  body.kiosk .oc-yoy-vs{display:none}
+
+  /* Kiosk section borders for TV readability */
+  body.kiosk .score-bar{border-bottom:1px solid var(--border)}
+  body.kiosk .ramageddon{border-bottom:1px solid var(--border)}
+
+  /* Kiosk alerts banner — scrolling toast at bottom */
+  .kiosk-alerts{display:none;flex-shrink:0;height:36px;background:var(--bg2);border-top:1px solid var(--border);overflow:hidden;position:relative}
+  body.kiosk .kiosk-alerts{display:flex;align-items:center}
+  .kiosk-alerts-label{flex-shrink:0;padding:0 12px;font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:1px;color:var(--yellow);border-right:1px solid var(--border);height:100%;display:flex;align-items:center;background:rgba(255,208,0,0.04)}
+  .kiosk-alerts-track{display:flex;align-items:center;gap:32px;animation:kioskAlertScroll 120s linear infinite;white-space:nowrap;padding:0 24px}
+  .kiosk-alert-item{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap}
+  .kiosk-alert-item .ka-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .kiosk-alert-item.critical .ka-dot{background:var(--red)}
+  .kiosk-alert-item.warning .ka-dot{background:var(--yellow)}
+  .kiosk-alert-item.opportunity .ka-dot{background:var(--green)}
+  .kiosk-alert-item.info .ka-dot{background:var(--cyan)}
+  .kiosk-alert-item .ka-time{color:var(--muted);font-size:9px}
+  .kiosk-alert-item .ka-text{color:var(--text)}
+  .kiosk-alert-item .ka-text strong{color:var(--cyan)}
+  @keyframes kioskAlertScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  /* Kiosk indicator — bottom bar */
+  body.kiosk .kiosk-indicator{display:flex}
+  .kiosk-indicator{display:none;position:fixed;bottom:42px;right:16px;padding:3px 12px;border-radius:12px;background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.12);font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--cyan);z-index:100;opacity:.5}
+
+  @media(max-width:1200px){.main{grid-template-columns:1fr}.sidebar{display:none}}
+  @media(max-width:768px){.cards-area{grid-template-columns:1fr;padding:10px}.score-bar{flex-wrap:wrap}.score-card{flex:1 1 45%}.rama-grid{grid-template-columns:1fr 1fr}.outlook-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ======== UPLOAD OVERLAY ======== -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-box" id="uploadBox">
+    <h1>COGS COMMAND CENTER</h1>
+    <div class="sub">Drop your product catalog CSV and the dashboard will auto-detect which<br>raw materials, components, and commodities affect your supply chain.</div>
+    <div class="drop-zone" id="dropZone">
+      <div class="dz-icon">\u{1F4C4}</div>
+      <div class="dz-text">Drop CSV file here or click to browse</div>
+      <div class="dz-hint">Accepts: .csv or .tsv &mdash; any column layout</div>
+      <input type="file" id="fileInput" accept=".csv,.tsv,.txt">
+    </div>
+    <div class="csv-format">
+      <strong>The dashboard reads any CSV.</strong> It scans all columns and values for product keywords.<br>
+      Common formats that work great:<br><br>
+      <code>SKU, Product Name, Category, Description</code><br>
+      <code>Part Number, Description, Qty, Unit Cost</code><br>
+      <code>Item, Type, Vendor, Notes</code><br><br>
+      Examples it will recognize: <em>"15-inch touchscreen POS terminal"</em>, <em>"Epson TM-T88 receipt printer"</em>,
+      <em>"Honeywell 1950g barcode scanner"</em>, <em>"Verifone P400 PIN pad"</em>, <em>"DDR4 8GB SO-DIMM"</em>,
+      <em>"256GB NVMe SSD"</em>, <em>"thermal paper 3 1/8"</em>, <em>"Cat6 ethernet cable"</em>, etc.
+    </div>
+    <div class="upload-or">or</div>
+    <button class="skip-btn" id="skipBtn">Load demo POS catalog &rarr;</button>
+  </div>
+  <div class="processing" id="processing">
+    <h2>ANALYZING CATALOG</h2>
+    <div class="proc-bar"><div class="fill"></div></div>
+    <div class="proc-log" id="procLog"></div>
+  </div>
+</div>
+
+<!-- ======== DASHBOARD (hidden until CSV loads) ======== -->
+<div class="dashboard-wrap" id="dashboard">
+
+<div class="ticker-wrap"><div class="ticker-track" id="ticker"></div></div>
+
+<div class="header">
+  <div class="header-left">
+    <h1>POS SUPPLY CHAIN // COGS</h1>
+    <div class="sub" id="headerSub">Point-of-Sale Systems &bull; Components &amp; Raw Materials &bull; Real-Time Index</div>
+  </div>
+  <div class="header-right">
+    <div class="market-status open">MARKETS ACTIVE</div>
+    <div style="display:flex;align-items:center;gap:6px"><div class="live-dot"></div><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green)">LIVE</span></div>
+    <div class="clock" id="clock">00:00:00</div>
+    <button class="settings-btn" id="exportBtn" title="Export CSV">DOWNLOAD</button>
+    <button class="settings-btn" id="settingsBtn" title="Settings">SETTINGS</button>
+  </div>
+</div>
+
+<!-- Settings Panel -->
+<div class="settings-overlay" id="settingsOverlay"></div>
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-panel-header">
+    <h2>\u2699 SETTINGS</h2>
+    <button class="settings-close" id="settingsClose">\u2715</button>
+  </div>
+  <div class="settings-body">
+    <div class="settings-group">
+      <div class="settings-group-title">DISPLAY MODE</div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Kiosk Mode</div>
+          <div class="so-desc">Single-viewport TV layout. No scrolling — fits everything on one screen.</div>
+        </div>
+        <label class="kiosk-toggle"><input type="checkbox" id="kioskToggle"><div class="slider"></div></label>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">KIOSK OPTIONS</div>
+      <div class="settings-option" id="kioskAutoScroll" style="display:none">
+        <div>
+          <div class="so-label">Auto-Scroll Cards</div>
+          <div class="so-desc">Automatically scroll through material cards every 10 seconds.</div>
+        </div>
+        <label class="kiosk-toggle"><input type="checkbox" id="autoScrollToggle" checked><div class="slider"></div></label>
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Show RAMAGEDDON</div>
+          <div class="so-desc">Memory crisis banner at top.</div>
+        </div>
+        <label class="kiosk-toggle"><input type="checkbox" id="kioskRamaToggle" checked><div class="slider"></div></label>
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Show Master Chart</div>
+          <div class="so-desc">YoY category bar chart.</div>
+        </div>
+        <label class="kiosk-toggle"><input type="checkbox" id="kioskChartToggle" checked><div class="slider"></div></label>
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Show Optimism Meters</div>
+          <div class="so-desc">Outlook gauges per category.</div>
+        </div>
+        <label class="kiosk-toggle"><input type="checkbox" id="kioskOutlookToggle" checked><div class="slider"></div></label>
+      </div>
+      <div class="settings-option" style="display:none">
+        <div>
+          <div class="so-label">Show Material Cards</div>
+          <div class="so-desc">Individual material detail cards.</div>
+        </div>
+        <label class="kiosk-toggle"><input type="checkbox" id="kioskCardsToggle" checked><div class="slider"></div></label>
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">TV Font Scale</div>
+          <div class="so-desc">Scale text for viewing distance. 100% default, up to 200% for far TVs.</div>
+        </div>
+        <select id="fontScale" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px">
+          <option value="0.85">85%</option>
+          <option value="1" selected>100%</option>
+          <option value="1.15">115%</option>
+          <option value="1.3">130%</option>
+          <option value="1.5">150%</option>
+          <option value="2">200%</option>
+        </select>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">TICKER</div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Ticker Speed</div>
+          <div class="so-desc">Scroll speed for top ticker bar.</div>
+        </div>
+        <select id="tickerSpeed" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px">
+          <option value="300">Slow</option>
+          <option value="180" selected>Normal</option>
+          <option value="100">Fast</option>
+        </select>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">ALERT THRESHOLDS</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Get alerted when any material crosses these YoY % thresholds.</div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Critical Alert (YoY %)</div>
+          <div class="so-desc">Fire critical alert when YoY exceeds this.</div>
+        </div>
+        <input type="number" id="threshCritical" value="80" min="0" max="500" style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--red);padding:6px 8px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;text-align:center">
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Warning Alert (YoY %)</div>
+          <div class="so-desc">Fire warning alert when YoY exceeds this.</div>
+        </div>
+        <input type="number" id="threshWarning" value="30" min="0" max="500" style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--yellow);padding:6px 8px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;text-align:center">
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Opportunity Alert (Day Change %)</div>
+          <div class="so-desc">Fire opportunity alert when day change drops below this.</div>
+        </div>
+        <input type="number" id="threshOpportunity" value="-0.5" step="0.1" min="-10" max="0" style="width:64px;background:var(--bg);border:1px solid var(--border);color:var(--green);padding:6px 8px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12px;text-align:center">
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-group-title">ABOUT</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.8;font-family:'JetBrains Mono',monospace">
+        POS Supply Chain COGS Command Center<br>
+        Material pricing baseline: April 2026<br>
+        Sources: TrendForce, Trading Economics, Metalary, ChemOrbis, J2 Sourcing<br>
+        Simulation tick: 3 seconds
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Kiosk mode indicator -->
+<div class="kiosk-indicator" id="kioskIndicator">KIOSK MODE \u2022 Press ESC to exit</div>
+
+<div class="ramageddon" id="ramageddon" style="display:none"></div>
+<div class="master-chart-section" id="masterChartSection" style="display:none">
+  <div class="master-chart-title">COST CATEGORY YoY % CHANGE — YOUR SUPPLY CHAIN</div>
+  <div class="master-chart" id="masterChart"></div>
+</div>
+<div class="outlook-section" id="outlookSection" style="display:none"></div>
+<div class="score-bar" id="scoreBar"></div>
+<div class="product-bar" id="productBar"></div>
+
+<div class="filter-bar" id="filterBar">
+  <span class="filter-label">Material Class:</span>
+  <button class="reload-csv" id="reloadCsv">\u{1F4C4} Load New CSV</button>
+</div>
+
+<div class="main">
+  <div class="cards-area" id="cardsArea"></div>
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">&#9888; RISK BY CATEGORY</div>
+      <div class="risk-grid" id="riskGrid"></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">&#9733; BIGGEST COST DRIVERS (YoY)</div>
+      <div id="leaderboard"></div>
+    </div>
+    <div class="alert-feed" id="alertFeed">
+      <div class="sidebar-title">&#9889; PROCUREMENT ALERTS</div>
+    </div>
+  </div>
+</div>
+
+<div class="sources-bar" id="sources"></div>
+
+<div class="kiosk-alerts" id="kioskAlerts">
+  <div class="kiosk-alerts-label">&#9889; ALERTS</div>
+  <div class="kiosk-alerts-track" id="kioskAlertsTrack"></div>
+</div>
+</div>
+
+<script>
+// ================================================================
+//  MATERIAL KNOWLEDGE BASE — April 2026 real-world pricing
+//  Sources: TrendForce, Trading Economics, Metalary, ChemOrbis, etc.
+// ================================================================
+const ALL_MATERIALS = [
+  // MEMORY & STORAGE
+  { sym:'DDR4', name:'DDR4 8GB Module', cat:'memory', unit:'$/module', base:82, vol:0.018, yoy:171, trend:'up', source:'TrendForce', impact:'high', note:'Spot ~$33.56/chip. AI demand consuming capacity. +2,200% surge.' },
+  { sym:'DDR5', name:'DDR5 16GB Module', cat:'memory', unit:'$/module', base:195, vol:0.022, yoy:120, trend:'up', source:'TrendForce', impact:'high', note:'Prices quadrupled since Sep 2025. Kit avg ~$529/32GB.' },
+  { sym:'NAND', name:'NAND Flash TLC', cat:'memory', unit:'$/GB', base:0.055, vol:0.025, yoy:85, trend:'up', source:'TrendForce', impact:'critical', note:'33-38% QoQ Q1 2026. Samsung mulling 20-30% more hikes. All mfrs sold out.' },
+  { sym:'SSD256', name:'SSD 256GB OEM', cat:'memory', unit:'$/unit', base:34, vol:0.02, yoy:65, trend:'up', source:'StorageDiskPrices', impact:'high', note:'NAND allocated to AI/enterprise. Consumer deprioritized.' },
+  { sym:'SSD512', name:'SSD 512GB OEM', cat:'memory', unit:'$/unit', base:55, vol:0.02, yoy:60, trend:'up', source:'StorageDiskPrices', impact:'high', note:'Wholesale $45-65 depending on volume.' },
+  { sym:'SSD1T', name:'SSD 1TB OEM', cat:'memory', unit:'$/unit', base:98, vol:0.02, yoy:55, trend:'up', source:'StorageDiskPrices', impact:'high', note:'Consumer 1TB retail $109-218.' },
+  { sym:'HDD1T', name:'HDD 1TB Wholesale', cat:'memory', unit:'$/unit', base:38, vol:0.012, yoy:15, trend:'up', source:'Seagate/Industry', impact:'medium', note:'$28.50-52 FOB. AI data center demand.' },
+  { sym:'HDD2T', name:'HDD 2TB Wholesale', cat:'memory', unit:'$/unit', base:58, vol:0.012, yoy:12, trend:'up', source:'Seagate/Industry', impact:'medium', note:'Steady demand, moderate increases.' },
+  { sym:'EMMC', name:'eMMC 32GB Module', cat:'memory', unit:'$/unit', base:6.50, vol:0.015, yoy:30, trend:'up', source:'Industry', impact:'medium', note:'Embedded storage for compact POS. NAND shortage affecting supply.' },
+
+  // METALS
+  { sym:'CU', name:'Copper', cat:'metals', unit:'$/lb', base:5.75, vol:0.015, yoy:31.8, trend:'up', source:'LME', impact:'high', note:'+31.76% YoY. PCB traces, wiring, connectors.' },
+  { sym:'AU', name:'Gold (Connectors)', cat:'metals', unit:'$/oz', base:4749, vol:0.008, yoy:42, trend:'up', source:'LBMA', impact:'medium', note:'Record ~$4,750/oz. Contact plating costs.' },
+  { sym:'SN', name:'Tin (Solder)', cat:'metals', unit:'$/lb', base:20.25, vol:0.02, yoy:18, trend:'down', source:'Metalary/LME', impact:'medium', note:'Down from Jan record. NA ~$20.25/lb.' },
+  { sym:'STEEL', name:'HRC Steel', cat:'metals', unit:'$/ton', base:1065, vol:0.012, yoy:15.8, trend:'up', source:'Trading Economics', impact:'medium', note:'Enclosures & chassis. Tightening supply.' },
+  { sym:'AL', name:'Aluminum', cat:'metals', unit:'$/lb', base:2.47, vol:0.01, yoy:5, trend:'stable', source:'Trading Economics', impact:'low', note:'US landed ~$2.47/lb. Holding steady.' },
+  { sym:'ZINC', name:'Zinc (Die-Cast)', cat:'metals', unit:'$/lb', base:1.32, vol:0.012, yoy:8, trend:'stable', source:'LME', impact:'low', note:'Die-cast housings and brackets.' },
+
+  // SEMICONDUCTORS
+  { sym:'MCU-M0', name:'Cortex-M0+ MCU', cat:'semicon', unit:'$/chip', base:0.95, vol:0.02, yoy:35, trend:'up', source:'TI/J2 Sourcing', impact:'high', note:'TI +15-85%. Lead: Renesas 20-45wk, Infineon 20-30wk.' },
+  { sym:'MCU-M4', name:'Cortex-M4 MCU', cat:'semicon', unit:'$/chip', base:2.80, vol:0.022, yoy:30, trend:'up', source:'STMicro/NXP', impact:'high', note:'NXP 12-20wk lead. China MCU makers +15-50%.' },
+  { sym:'SOC-A53', name:'Cortex-A53 SoC', cat:'semicon', unit:'$/chip', base:16.50, vol:0.018, yoy:25, trend:'up', source:'Industry/Utmel', impact:'critical', note:'For Android POS. Foundry capacity locked by AI.' },
+  { sym:'SOC-A72', name:'Cortex-A72 SoC', cat:'semicon', unit:'$/chip', base:28, vol:0.018, yoy:22, trend:'up', source:'Industry', impact:'high', note:'Premium POS terminal processors.' },
+  { sym:'MBOARD', name:'Mini-ITX Embedded', cat:'semicon', unit:'$/unit', base:165, vol:0.015, yoy:20, trend:'up', source:'Industry OEM', impact:'high', note:'Celeron $80-150, Core i3/i5 $150-350.' },
+  { sym:'PSU', name:'POS Power Supply', cat:'power', unit:'$/unit', base:9.50, vol:0.008, yoy:3, trend:'stable', source:'Industry OEM', impact:'low', note:'12V/24V 60-120W. Commodity pricing.' },
+  { sym:'UPS-SM', name:'Small UPS Module', cat:'power', unit:'$/unit', base:35, vol:0.01, yoy:5, trend:'stable', source:'Industry', impact:'low', note:'Battery backup for POS systems.' },
+
+  // DISPLAYS
+  { sym:'LCD10', name:'10.1" TFT LCD Panel', cat:'displays', unit:'$/panel', base:32, vol:0.012, yoy:8, trend:'stable', source:'Industry OEM', impact:'medium', note:'Wholesale $15-57. Customer-facing displays.' },
+  { sym:'LCD15', name:'15" LCD Panel LVDS', cat:'displays', unit:'$/panel', base:48, vol:0.012, yoy:10, trend:'up', source:'Industry OEM', impact:'medium', note:'$25-80. Standard POS terminal size.' },
+  { sym:'LCD22', name:'22" LCD Panel', cat:'displays', unit:'$/panel', base:78, vol:0.012, yoy:8, trend:'stable', source:'Industry OEM', impact:'medium', note:'Self-service kiosk displays.' },
+  { sym:'TOUCH10', name:'10" Cap Touch Digi', cat:'displays', unit:'$/unit', base:22, vol:0.01, yoy:5, trend:'stable', source:'Industry OEM', impact:'low', note:'Capacitive touch for customer displays.' },
+  { sym:'TOUCH15', name:'15" Cap Touch Digi', cat:'displays', unit:'$/unit', base:38, vol:0.01, yoy:5, trend:'stable', source:'Industry OEM', impact:'low', note:'Capacitive $25-60.' },
+  { sym:'LED', name:'LED Backlight Strip', cat:'displays', unit:'$/assy', base:2.80, vol:0.008, yoy:-5, trend:'down', source:'Industry', impact:'low', note:'Commodity. Declining costs.' },
+
+  // PAYMENT
+  { sym:'EMV', name:'EMV Chip Reader', cat:'payment', unit:'$/module', base:42, vol:0.015, yoy:12, trend:'up', source:'MagTek/Industry', impact:'high', note:'PCI compliance driving upgrades. $20-100 range.' },
+  { sym:'NFC', name:'NFC Contactless Reader', cat:'payment', unit:'$/module', base:35, vol:0.018, yoy:18, trend:'up', source:'Industry OEM', impact:'medium', note:'$25-60 certified. Tap-to-pay demand surging.' },
+  { sym:'PINPAD', name:'Encrypted PIN Pad', cat:'payment', unit:'$/module', base:75, vol:0.012, yoy:8, trend:'stable', source:'Industry OEM', impact:'medium', note:'PCI-certified $50-120.' },
+  { sym:'MSR', name:'Mag Stripe Reader', cat:'payment', unit:'$/module', base:8, vol:0.006, yoy:-2, trend:'down', source:'Industry', impact:'low', note:'Legacy. Declining demand.' },
+  { sym:'SCAN1D', name:'1D Laser Scan Engine', cat:'payment', unit:'$/module', base:14, vol:0.008, yoy:2, trend:'stable', source:'Honeywell/Netum', impact:'low', note:'$8-20. Mature tech.' },
+  { sym:'SCAN2D', name:'2D Imager Module', cat:'payment', unit:'$/module', base:28, vol:0.01, yoy:5, trend:'stable', source:'Honeywell/Rakinda', impact:'low', note:'CMOS $15-45. QR demand steady.' },
+
+  // PLASTICS & PCB
+  { sym:'ABS', name:'ABS Resin', cat:'plastics', unit:'$/lb', base:0.76, vol:0.012, yoy:4, trend:'up', source:'ChemOrbis', impact:'low', note:'Housings/enclosures. Feedstock costs up.' },
+  { sym:'POLYC', name:'Polycarbonate', cat:'plastics', unit:'$/lb', base:1.49, vol:0.012, yoy:-3, trend:'down', source:'ChemAnalyst', impact:'low', note:'Display covers. Lower feedstock.' },
+  { sym:'FR4', name:'FR4 PCB Laminate', cat:'plastics', unit:'$/sqft', base:28, vol:0.008, yoy:2, trend:'stable', source:'JLCPCB/Industry', impact:'medium', note:'$14-72/sqft. Every device needs PCBs.' },
+  { sym:'RUBBER', name:'Silicone Rubber', cat:'plastics', unit:'$/lb', base:3.20, vol:0.008, yoy:3, trend:'stable', source:'Industry', impact:'low', note:'Keypads, gaskets, seals.' },
+
+  // THERMAL PRINTING
+  { sym:'TPAPER', name:'Thermal Paper Roll', cat:'thermal', unit:'$/roll', base:0.68, vol:0.006, yoy:1, trend:'stable', source:'POSPaper.com', impact:'low', note:'3-1/8"x230\'. ~$0.01/receipt.' },
+  { sym:'THEAD', name:'Thermal Print Head 80mm', cat:'thermal', unit:'$/unit', base:24, vol:0.01, yoy:3, trend:'stable', source:'Industry OEM', impact:'medium', note:'$18-30. 150km rated life.' },
+  { sym:'TMECH', name:'Printer Mechanism 80mm', cat:'thermal', unit:'$/unit', base:35, vol:0.01, yoy:4, trend:'stable', source:'Industry OEM', impact:'medium', note:'With auto-cutter $25-45.' },
+  { sym:'TPAPER58', name:'Thermal Paper 58mm', cat:'thermal', unit:'$/roll', base:0.42, vol:0.006, yoy:1, trend:'stable', source:'POSPaper.com', impact:'low', note:'Smaller format for mobile POS.' },
+  { sym:'THEAD58', name:'Thermal Print Head 58mm', cat:'thermal', unit:'$/unit', base:18, vol:0.01, yoy:3, trend:'stable', source:'Industry OEM', impact:'low', note:'$15-21 OEM. Compact printers.' },
+
+  // NETWORKING & CONNECTIVITY
+  { sym:'WIFI6', name:'WiFi 6 Module', cat:'networking', unit:'$/module', base:8.50, vol:0.012, yoy:10, trend:'up', source:'Industry', impact:'medium', note:'802.11ax for connected POS.' },
+  { sym:'BT5', name:'Bluetooth 5.x Module', cat:'networking', unit:'$/module', base:3.20, vol:0.01, yoy:5, trend:'stable', source:'Industry', impact:'low', note:'Peripheral connectivity.' },
+  { sym:'ETH-IC', name:'Ethernet PHY IC', cat:'networking', unit:'$/chip', base:1.85, vol:0.015, yoy:15, trend:'up', source:'Industry', impact:'medium', note:'Semiconductor shortage affecting networking chips.' },
+  { sym:'CAT6', name:'Cat6 Cable (per ft)', cat:'networking', unit:'$/ft', base:0.28, vol:0.008, yoy:8, trend:'stable', source:'Industry', impact:'low', note:'Copper price driving cable costs.' },
+  { sym:'USB-C', name:'USB-C Connector', cat:'networking', unit:'$/unit', base:0.45, vol:0.008, yoy:3, trend:'stable', source:'Industry', impact:'low', note:'Standard I/O connector.' },
+
+  // BATTERIES & POWER
+  { sym:'LIBAT', name:'Li-Ion Battery 18650', cat:'power', unit:'$/cell', base:2.80, vol:0.015, yoy:12, trend:'up', source:'Industry', impact:'medium', note:'Mobile POS battery packs.' },
+  { sym:'LIPO', name:'LiPo Battery Pack', cat:'power', unit:'$/Wh', base:0.14, vol:0.012, yoy:8, trend:'stable', source:'Industry', impact:'medium', note:'Tablet and handheld POS.' },
+];
+
+// ================================================================
+//  PRODUCT RECOGNITION ENGINE
+//  Maps product text -> relevant raw materials & components
+// ================================================================
+const PRODUCT_RULES = [
+  // --- POS TERMINALS / COMPUTERS ---
+  { patterns: [/\bpos\b/i, /\bterminal/i, /\bregister/i, /\bworkstation/i, /\ball[\s-]?in[\s-]?one/i, /\bkiosk/i, /\bself[\s-]?service/i, /\bself[\s-]?checkout/i],
+    materials: ['DDR4','DDR5','NAND','SSD256','SSD512','SSD1T','SOC-A53','SOC-A72','MBOARD','PSU','LCD15','LCD22','TOUCH15','ABS','POLYC','FR4','CU','SN','STEEL','WIFI6','ETH-IC'],
+    label: 'POS Terminal / Computer' },
+
+  // --- MEMORY / RAM ---
+  { patterns: [/\bram\b/i, /\bddr[45]/i, /\bdimm/i, /\bso[\s-]?dimm/i, /\bmemory\s*(module|stick|chip|upgrade)/i],
+    materials: ['DDR4','DDR5','NAND'],
+    label: 'Memory / RAM' },
+
+  // --- STORAGE ---
+  { patterns: [/\bssd\b/i, /\bnvme\b/i, /\bsolid[\s-]?state/i, /\bm\.?2\b/i, /\bsata\b/i],
+    materials: ['NAND','SSD256','SSD512','SSD1T'],
+    label: 'SSD Storage' },
+  { patterns: [/\bhdd\b/i, /\bhard[\s-]?d(rive|isk)/i, /\bstorage[\s-]?drive/i],
+    materials: ['HDD1T','HDD2T','STEEL'],
+    label: 'HDD Storage' },
+  { patterns: [/\bemmc\b/i, /\bflash[\s-]?storage/i],
+    materials: ['EMMC','NAND'],
+    label: 'Embedded Storage' },
+
+  // --- PRINTERS ---
+  { patterns: [/\bprinter/i, /\breceipt/i, /\bthermal[\s-]?print/i, /\btm[\s-]?t[0-9]/i, /\bepson/i, /\bstar[\s-]?tsp/i, /\bbixolon/i, /\bcitizen[\s-]?ct/i],
+    materials: ['THEAD','THEAD58','TMECH','TPAPER','TPAPER58','MCU-M0','PSU','ABS','STEEL','FR4','CU','SN','USB-C','ETH-IC'],
+    label: 'Receipt Printer' },
+  { patterns: [/\blabel[\s-]?printer/i, /\bbarcode[\s-]?printer/i, /\bzebra\b/i],
+    materials: ['THEAD','TMECH','MCU-M4','PSU','ABS','FR4','CU','WIFI6'],
+    label: 'Label Printer' },
+
+  // --- SCANNERS ---
+  { patterns: [/\bscanner/i, /\bbarcode/i, /\bimager/i, /\b1950g\b/i, /\bhoneywell/i, /\bzebra[\s-]?ds/i, /\bsymbol[\s-]?ls/i, /\bdatalogic/i, /\bqr[\s-]?code/i, /\bscan[\s-]?engine/i, /\bscan[\s-]?gun/i],
+    materials: ['SCAN1D','SCAN2D','MCU-M0','LED','ABS','FR4','CU','USB-C','BT5'],
+    label: 'Barcode Scanner' },
+
+  // --- PIN PADS / PAYMENT ---
+  { patterns: [/\bpin[\s-]?pad/i, /\bpayment[\s-]?terminal/i, /\bverifone/i, /\bingenico/i, /\bpax\b/i, /\bdejavoo/i, /\bcredit[\s-]?card[\s-]?(terminal|reader|machine)/i, /\beft\b/i, /\bchip[\s-]?(reader|card)/i, /\bcontactless/i, /\btap[\s-]?to[\s-]?pay/i, /\bemv\b/i, /\bnfc\b/i],
+    materials: ['PINPAD','EMV','NFC','MSR','MCU-M4','SOC-A53','LCD10','TOUCH10','ABS','FR4','CU','SN','AU','LIBAT','LIPO','WIFI6','BT5'],
+    label: 'PIN Pad / Payment Terminal' },
+
+  // --- CASH DRAWERS ---
+  { patterns: [/\bcash[\s-]?drawer/i, /\bcash[\s-]?register[\s-]?drawer/i, /\btill\b/i, /\bmoney[\s-]?drawer/i],
+    materials: ['STEEL','AL','ZINC','PSU'],
+    label: 'Cash Drawer' },
+
+  // --- DISPLAYS / MONITORS ---
+  { patterns: [/\bdisplay/i, /\bmonitor/i, /\bscreen/i, /\btouch[\s-]?screen/i, /\bcustomer[\s-]?facing/i, /\bpole[\s-]?display/i, /\blcd\b/i],
+    materials: ['LCD10','LCD15','LCD22','TOUCH10','TOUCH15','LED','ABS','POLYC','FR4','CU','PSU'],
+    label: 'Display / Monitor' },
+
+  // --- TABLETS / MOBILE POS ---
+  { patterns: [/\btablet/i, /\bmobile[\s-]?pos/i, /\bhandheld/i, /\bandroid[\s-]?(pos|terminal|device)/i, /\bipad/i],
+    materials: ['SOC-A53','DDR4','EMMC','NAND','SSD256','LCD10','TOUCH10','LIBAT','LIPO','WIFI6','BT5','NFC','ABS','POLYC','FR4'],
+    label: 'Tablet / Mobile POS' },
+
+  // --- NETWORKING ---
+  { patterns: [/\brouter/i, /\bswitch\b/i, /\bethernet/i, /\bnetwork/i, /\bcat[\s-]?[56]/i, /\bwifi\b/i, /\bwi[\s-]?fi/i, /\baccess[\s-]?point/i, /\bcable\b/i, /\bpatch\b/i],
+    materials: ['ETH-IC','WIFI6','CAT6','CU','FR4','PSU','ABS','MCU-M0'],
+    label: 'Networking Equipment' },
+
+  // --- PERIPHERALS ---
+  { patterns: [/\bkeyboard/i, /\bprogrammable[\s-]?key/i],
+    materials: ['MCU-M0','ABS','RUBBER','FR4','USB-C','CU'],
+    label: 'Keyboard / Input' },
+  { patterns: [/\bmouse/i, /\btrackpad/i],
+    materials: ['MCU-M0','ABS','FR4','USB-C'],
+    label: 'Mouse / Trackpad' },
+  { patterns: [/\bpower[\s-]?supply/i, /\badapter/i, /\bcharger/i, /\bups\b/i, /\bbattery[\s-]?backup/i, /\bsurge/i],
+    materials: ['PSU','UPS-SM','LIBAT','CU','STEEL'],
+    label: 'Power / UPS' },
+
+  // --- PAPER / SUPPLIES ---
+  { patterns: [/\bpaper\b/i, /\bthermal[\s-]?paper/i, /\breceipt[\s-]?paper/i, /\broll\b/i],
+    materials: ['TPAPER','TPAPER58'],
+    label: 'Thermal Paper' },
+
+  // --- MOTHERBOARD / SBC ---
+  { patterns: [/\bmother[\s-]?board/i, /\bmainboard/i, /\bsbc\b/i, /\bsingle[\s-]?board/i, /\bmini[\s-]?itx/i, /\bnuc\b/i, /\bcompute[\s-]?module/i],
+    materials: ['MBOARD','SOC-A53','SOC-A72','DDR4','DDR5','FR4','CU','SN','AU'],
+    label: 'Motherboard / SBC' },
+
+  // --- GENERIC CATCH: COMPUTER ---
+  { patterns: [/\bcomputer/i, /\bpc\b/i, /\bdesktop\b/i, /\blaptop/i, /\bmini[\s-]?pc/i],
+    materials: ['DDR4','DDR5','NAND','SSD256','SSD512','HDD1T','MBOARD','SOC-A53','PSU','STEEL','ABS','FR4','CU','SN','WIFI6','ETH-IC','USB-C'],
+    label: 'Computer' },
+];
+
+// ================================================================
+//  CSV PARSER & PRODUCT MAPPER
+// ================================================================
+function parseCSV(text) {
+  const sep = text.indexOf('\t') !== -1 && text.split('\t').length > text.split(',').length ? '\t' : ',';
+  const lines = text.trim().split(/\r?\n/);
+  const rows = lines.map(line => {
+    const result = []; let current = ''; let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuotes = !inQuotes; }
+      else if (c === sep && !inQuotes) { result.push(current.trim()); current = ''; }
+      else { current += c; }
+    }
+    result.push(current.trim());
+    return result;
+  });
+  return { headers: rows[0] || [], rows: rows.slice(1) };
+}
+
+function analyzeCSV(csv) {
+  const log = [];
+  const productMap = new Map(); // product label -> { count, materials: Set, sampleRows }
+  const materialHits = new Map(); // material sym -> Set of product labels
+  let matchedRows = 0;
+
+  csv.rows.forEach((row, idx) => {
+    const fullText = row.join(' ');
+    let matched = false;
+
+    for (const rule of PRODUCT_RULES) {
+      for (const pat of rule.patterns) {
+        if (pat.test(fullText)) {
+          matched = true;
+          if (!productMap.has(rule.label)) {
+            productMap.set(rule.label, { count: 0, materials: new Set(), samples: [] });
+          }
+          const entry = productMap.get(rule.label);
+          entry.count++;
+          rule.materials.forEach(m => {
+            entry.materials.add(m);
+            if (!materialHits.has(m)) materialHits.set(m, new Set());
+            materialHits.get(m).add(rule.label);
+          });
+          if (entry.samples.length < 3) entry.samples.push(fullText.substring(0, 80));
+          break; // one rule match per row is enough
+        }
+      }
+      if (matched) break;
+    }
+    if (matched) matchedRows++;
+  });
+
+  // Build log
+  log.push({ text: `Parsed ${csv.rows.length} rows, ${csv.headers.length} columns`, cls: 'match' });
+  log.push({ text: `Matched ${matchedRows} product rows (${Math.round(matchedRows/csv.rows.length*100)}%)`, cls: 'match' });
+  productMap.forEach((v, k) => {
+    log.push({ text: `\u2714 ${k}: ${v.count} items \u2192 ${v.materials.size} materials tracked`, cls: 'match' });
+  });
+  const unmatched = csv.rows.length - matchedRows;
+  if (unmatched > 0) {
+    log.push({ text: `${unmatched} rows didn't match known product types (generic supplies, services, etc.)`, cls: 'skip' });
+  }
+
+  return { productMap, materialHits, log, totalRows: csv.rows.length, matchedRows };
+}
+
+// ================================================================
+//  DASHBOARD STATE & RENDERING
+// ================================================================
+let state = [];
+let products = new Map();
+let materialProducts = new Map(); // sym -> [product labels]
+let activeFilter = 'all';
+let activeProduct = 'all';
+let alertCount = 0;
+let tickInterval = null;
+
+function genHistory(mat) {
+  const pts = [];
+  let p = mat.base * (mat.yoy > 0 ? 0.85 : 1.05);
+  const bias = mat.trend === 'up' ? 0.008 : mat.trend === 'down' ? -0.006 : 0;
+  for (let i = 0; i < 90; i++) {
+    p = Math.max(p * 0.5, p + (Math.random() - 0.5) * mat.vol * p * 2 + bias * p * (1 + Math.random() * 0.5));
+    pts.push(p);
+  }
+  const scale = mat.base / pts[pts.length - 1];
+  return pts.map(v => +(v * scale).toPrecision(6));
+}
+
+function initDashboard(materialSyms, prodMap, matProdMap) {
+  products = prodMap;
+  materialProducts = matProdMap;
+
+  const activeMats = ALL_MATERIALS.filter(m => materialSyms.has(m.sym));
+  state = activeMats.map(m => {
+    const h = genHistory(m);
+    return { ...m, history: h, price: h[h.length-1], prevPrice: h[h.length-1], dayStart: h[Math.max(0,h.length-8)], dayChange: ((h[h.length-1]-h[Math.max(0,h.length-8)])/h[Math.max(0,h.length-8)])*100, streak: Math.floor(Math.random()*6)+1, streakDir: m.trend==='down'?'down':'up', productLabels: matProdMap.has(m.sym) ? [...matProdMap.get(m.sym)] : [] };
+  });
+
+  document.getElementById('dashboard').classList.add('active');
+  document.getElementById('headerSub').textContent = `${state.length} materials tracked \u2022 ${prodMap.size} product categories detected \u2022 Real-time index`;
+
+  renderProductBar();
+  renderFilterBar();
+  renderAll(true);
+
+  if (tickInterval) clearInterval(tickInterval);
+  tickInterval = setInterval(tick, 3000);
+
+  // If kiosk mode was persisted, apply it now
+  if (kioskMode) { applyKioskSections(); startAutoScroll(); }
+
+  addAlert(`Dashboard loaded: <strong>${state.length} materials</strong> across <strong>${prodMap.size} product categories</strong>.`, 'info');
+  const criticals = state.filter(m => m.impact === 'critical' || m.yoy > 50);
+  if (criticals.length) {
+    criticals.forEach(m => addAlert(`<strong>${m.sym}</strong> \u2014 ${m.name} is +${m.yoy}% YoY. ${m.note}`, 'critical'));
+  }
+}
+
+function fmt(p) {
+  if (p >= 1000) return p.toLocaleString('en-US',{maximumFractionDigits:0});
+  if (p >= 10) return p.toFixed(2);
+  if (p >= 1) return p.toFixed(2);
+  if (p >= 0.01) return p.toFixed(3);
+  return p.toFixed(4);
+}
+function catColor(cat) {
+  return {memory:'#a855f7',metals:'#00e5ff',semicon:'#ffd000',displays:'#ff6eb4',payment:'#00ff88',plastics:'#ff8c00',thermal:'#3b82f6',networking:'#00e5ff',power:'#ff8c00'}[cat]||'#fff';
+}
+
+function renderProductBar() {
+  const bar = document.getElementById('productBar');
+  let html = `<div class="prod-chip ${activeProduct==='all'?'active':''}" data-prod="all"><div class="prod-name">All Products</div><div class="prod-count">${state.length} materials</div></div>`;
+  products.forEach((v, label) => {
+    const mats = state.filter(m => m.productLabels.includes(label));
+    const avgYoY = mats.length ? mats.reduce((a,m)=>a+m.yoy,0)/mats.length : 0;
+    const risk = avgYoY > 40 ? 'high' : avgYoY > 15 ? 'med' : 'low';
+    html += `<div class="prod-chip ${activeProduct===label?'active':''}" data-prod="${label}"><div class="prod-risk ${risk}"></div><div class="prod-name">${label}</div><div class="prod-count">${v.count} SKUs \u2192 ${mats.length} materials</div></div>`;
+  });
+  bar.innerHTML = html;
+  bar.querySelectorAll('.prod-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      activeProduct = chip.dataset.prod;
+      renderProductBar();
+      renderCards();
+    });
+  });
+}
+
+function renderFilterBar() {
+  const cats = [...new Set(state.map(m => m.cat))].sort();
+  const bar = document.getElementById('filterBar');
+  const reloadBtn = bar.querySelector('.reload-csv');
+  bar.innerHTML = `<span class="filter-label">Material Class:</span><button class="filter-btn active" data-filter="all">All (${state.length})</button>`;
+  const catLabels = {memory:'Memory & Storage',metals:'Metals',semicon:'Semiconductors',displays:'Displays',payment:'Payment',plastics:'Plastics & PCB',thermal:'Thermal Print',networking:'Networking',power:'Power'};
+  cats.forEach(c => {
+    const count = state.filter(m => m.cat === c).length;
+    bar.innerHTML += `<button class="filter-btn" data-filter="${c}">${catLabels[c]||c} (${count})</button>`;
+  });
+  bar.appendChild(reloadBtn);
+  bar.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      bar.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      renderCards();
+    });
+  });
+}
+
+function renderTicker() {
+  const el = document.getElementById('ticker');
+  // Sort by absolute change so biggest movers show first, then duplicate for seamless scroll
+  const sorted = [...state].sort((a,b)=>Math.abs(b.dayChange)-Math.abs(a.dayChange));
+  const items = sorted.concat(sorted);
+  el.innerHTML = items.map(m => {
+    const costUp = m.dayChange >= 0; // cost going up = bad
+    const cls = costUp ? 'up' : 'down'; // up=red(bad), down=green(good)
+    const arrow = costUp ? '\u25B2' : '\u25BC';
+    const sign = costUp ? '+' : '';
+    return `<div class="ticker-item">
+      <span class="sym">${m.sym}</span>
+      <span style="color:var(--muted);font-size:10px">${m.name}</span>
+      <span>${fmt(m.price)} <span style="color:var(--muted)">${m.unit}</span></span>
+      <span class="change ${cls}">${arrow} ${sign}${m.dayChange.toFixed(2)}%</span>
+    </div>`;
+  }).join('');
+}
+
+function renderScoreBar() {
+  const filtered = activeProduct==='all' ? state : state.filter(m => m.productLabels.includes(activeProduct));
+  const avg = filtered.reduce((a,m)=>a+m.dayChange,0)/filtered.length||0;
+  const risers = filtered.filter(m=>m.dayChange>0).length;
+  const criticals = filtered.filter(m=>m.impact==='critical'||m.yoy>50).length;
+  const highImpact = filtered.filter(m=>m.impact==='high').length;
+  const avgYoY = filtered.reduce((a,m)=>a+m.yoy,0)/filtered.length||0;
+
+  document.getElementById('scoreBar').innerHTML = `
+    <div class="score-card ${avg>=0?'red':'green'}"><div class="label">COGS Index (Today)</div><div class="value">${avg>=0?'+':''}${avg.toFixed(2)}%</div><div class="detail">${filtered.length} materials</div></div>
+    <div class="score-card purple"><div class="label">Avg YoY Change</div><div class="value">${avgYoY>=0?'+':''}${avgYoY.toFixed(1)}%</div><div class="detail">Year-over-year pressure</div></div>
+    <div class="score-card cyan"><div class="label">Breadth</div><div class="value">${risers} / ${filtered.length-risers}</div><div class="detail">${risers>filtered.length/2?'Majority rising':'Mixed'}</div></div>
+    <div class="score-card ${criticals>0?'red':'yellow'}"><div class="label">Risk Items</div><div class="value">${criticals}C / ${highImpact}H</div><div class="detail">${criticals} critical, ${highImpact} high</div></div>
+    <div class="score-card ${avgYoY>30?'red':avgYoY>10?'yellow':'green'}"><div class="label">Supply Chain Risk</div><div class="value">${avgYoY>30?'CRITICAL':avgYoY>15?'ELEVATED':avgYoY>5?'MODERATE':'NORMAL'}</div><div class="detail">Based on your catalog</div></div>`;
+}
+
+function drawSparkline(canvas, data, color) {
+  const dpr=window.devicePixelRatio||1;
+  const ctx=canvas.getContext('2d');const w=canvas.width=canvas.offsetWidth*dpr;const h=canvas.height=canvas.offsetHeight*dpr;
+  ctx.scale(dpr,dpr);const dw=canvas.offsetWidth;const dh=canvas.offsetHeight;
+  ctx.clearRect(0,0,dw,dh);const min=Math.min(...data),max=Math.max(...data),range=max-min||1;
+  const grad=ctx.createLinearGradient(0,0,0,dh);grad.addColorStop(0,color+'25');grad.addColorStop(1,color+'00');
+  ctx.beginPath();ctx.moveTo(0,dh);
+  data.forEach((v,i)=>{ctx.lineTo((i/(data.length-1))*dw,dh-((v-min)/range)*dh*0.85-dh*0.05)});
+  ctx.lineTo(dw,dh);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();data.forEach((v,i)=>{const x=(i/(data.length-1))*dw,y=dh-((v-min)/range)*dh*0.85-dh*0.05;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.stroke();
+  const ly=dh-((data[data.length-1]-min)/range)*dh*0.85-dh*0.05;
+  ctx.beginPath();ctx.arc(dw,ly,3,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();
+  ctx.beginPath();ctx.arc(dw,ly,7,0,Math.PI*2);ctx.fillStyle=color+'35';ctx.fill();
+}
+
+function renderCards() {
+  const area = document.getElementById('cardsArea');
+  let filtered = activeFilter==='all' ? [...state] : state.filter(m=>m.cat===activeFilter);
+  if (activeProduct!=='all') filtered = filtered.filter(m=>m.productLabels.includes(activeProduct));
+  const sorted = filtered.sort((a,b)=>Math.abs(b.yoy)-Math.abs(a.yoy));
+
+  area.innerHTML = sorted.map(m => {
+    const up=m.dayChange>=0; const color=up?'var(--red)':'var(--green)'; const arrow=up?'\u25B2':'\u25BC';
+    let badge='';
+    if(m.impact==='critical'||m.yoy>80) badge='<div class="rank-badge critical">CRITICAL</div>';
+    else if(m.impact==='high'&&m.yoy>20) badge='<div class="rank-badge watch">WATCH</div>';
+    const trendCls=m.trend==='up'?'up':m.trend==='down'?'down':'stable';
+    const trendIcon=m.trend==='up'?'\u2191 Rising':m.trend==='down'?'\u2193 Falling':'\u2192 Stable';
+    const prodTags = m.productLabels.slice(0,4).map(l=>`<span class="card-prod-tag">${l}</span>`).join('');
+
+    return `<div class="material-card" data-sym="${m.sym}" data-cat="${m.cat}">
+      ${badge}
+      <div class="card-header"><div><div class="card-symbol">${m.sym}</div><div class="card-name">${m.name}</div></div><div class="card-badge ${m.cat}">${m.cat}</div></div>
+      <div class="card-price-row"><div class="card-price" style="color:${color}">${fmt(m.price)}</div><div class="card-unit">${m.unit}</div><div class="card-change ${up?'up':'down'}">${arrow} ${Math.abs(m.dayChange).toFixed(2)}%</div></div>
+      <div class="card-chart"><canvas id="chart-${m.sym}"></canvas></div>
+      <div class="card-footer"><div class="card-trend ${trendCls}">${trendIcon} (YoY ${m.yoy>0?'+':''}${m.yoy}%)</div><div class="card-source">${m.source}</div></div>
+      ${m.productLabels.length?`<div class="card-products">${prodTags}</div>`:''}
+    </div>`;
+  }).join('');
+
+  sorted.forEach(m=>{const c=document.getElementById(`chart-${m.sym}`);if(c)drawSparkline(c,m.history.slice(-30),catColor(m.cat))});
+}
+
+function renderRiskGrid() {
+  const filtered = activeProduct==='all' ? state : state.filter(m=>m.productLabels.includes(activeProduct));
+  const cats = [...new Set(filtered.map(m=>m.cat))];
+  const labels={memory:'Memory',metals:'Metals',semicon:'Semicon',displays:'Display',payment:'Payment',plastics:'Plastics',thermal:'Thermal',networking:'Network',power:'Power'};
+  document.getElementById('riskGrid').innerHTML = cats.slice(0,6).map(c=>{
+    const items=filtered.filter(m=>m.cat===c);
+    const avgYoY=items.reduce((a,m)=>a+m.yoy,0)/items.length;
+    const pct=Math.min(Math.abs(avgYoY)/100*100,100);
+    const color=catColor(c);
+    const level=avgYoY>50?'CRITICAL':avgYoY>20?'HIGH':avgYoY>5?'MEDIUM':'LOW';
+    return `<div class="risk-cell"><div class="r-label">${labels[c]||c}</div><div class="r-value" style="color:${color}">${level}</div><div class="r-bar"><div class="r-fill" style="width:${pct}%;background:${color};box-shadow:0 0 6px ${color}40"></div></div></div>`;
+  }).join('');
+}
+
+function renderLeaderboard() {
+  const filtered = activeProduct==='all' ? state : state.filter(m=>m.productLabels.includes(activeProduct));
+  const sorted=[...filtered].sort((a,b)=>Math.abs(b.yoy)-Math.abs(a.yoy)).slice(0,8);
+  const ranks=['gold','silver','bronze'];
+  document.getElementById('leaderboard').innerHTML = sorted.map((m,i)=>{
+    const color=m.yoy>0?'var(--red)':'var(--green)';
+    return `<div class="leader-row"><div class="leader-rank ${ranks[i]||'normal'}">${i+1}</div><div class="leader-name">${m.sym}<br><span class="leader-impact">${m.name}</span></div><div class="leader-val" style="color:${color}">${m.yoy>0?'+':''}${m.yoy}%</div></div>`;
+  }).join('');
+}
+
+const kioskAlertQueue = [];
+function addAlert(text,type) {
+  const timeStr = new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/Los_Angeles'}) + ' PST';
+  // Sidebar alerts
+  const feed=document.getElementById('alertFeed');const title=feed.querySelector('.sidebar-title');
+  const div=document.createElement('div');div.className=`alert-item ${type}`;
+  div.innerHTML=`<div class="alert-time">${timeStr}</div><div class="alert-text">${text}</div>`;
+  title.after(div);alertCount++;
+  const items=feed.querySelectorAll('.alert-item');if(items.length>15)items[items.length-1].remove();
+  // Kiosk alerts banner
+  kioskAlertQueue.push({text, type, time: timeStr});
+  if (kioskAlertQueue.length > 20) kioskAlertQueue.shift();
+  renderKioskAlerts();
+}
+function renderKioskAlerts() {
+  const track = document.getElementById('kioskAlertsTrack');
+  if (!track) return;
+  const alerts = kioskAlertQueue.length ? kioskAlertQueue : [{text:'No alerts yet — monitoring all materials',type:'info',time:''}];
+  // Duplicate for seamless scroll loop
+  const all = alerts.concat(alerts);
+  track.innerHTML = all.map(a =>
+    `<div class="kiosk-alert-item ${a.type}"><span class="ka-dot"></span><span class="ka-time">${a.time}</span><span class="ka-text">${a.text}</span></div>`
+  ).join('');
+}
+
+function renderSources() {
+  document.getElementById('sources').innerHTML = `<span>DATA SOURCES:</span>
+    <a href="https://www.trendforce.com/price/dram" target="_blank">TrendForce</a>
+    <a href="https://tradingeconomics.com/commodities" target="_blank">Trading Economics</a>
+    <a href="https://www.metalary.com" target="_blank">Metalary</a>
+    <a href="https://www.chemorbis.com" target="_blank">ChemOrbis</a>
+    <a href="https://j2sourcing.com/blog" target="_blank">J2 Sourcing</a>
+    <span style="margin-left:auto">Baseline: April 2026 \u2022 Sim: 3s tick</span>`;
+}
+
+function renderRamageddon() {
+  const ramSyms = ['DDR4','DDR5','NAND','SSD256','SSD512','SSD1T','HDD1T','HDD2T','EMMC'];
+  const ramMats = state.filter(m => ramSyms.includes(m.sym));
+  if (!ramMats.length) { document.getElementById('ramageddon').style.display='none'; return; }
+  document.getElementById('ramageddon').style.display='block';
+
+  const avgYoY = ramMats.reduce((a,m)=>a+m.yoy,0)/ramMats.length;
+  const level = avgYoY > 80 ? 'DEFCON 1' : avgYoY > 50 ? 'DEFCON 2' : avgYoY > 25 ? 'ELEVATED' : 'WATCH';
+
+  const newsItems = [
+    `<strong>DRAM CRISIS:</strong> DDR4 spot prices +171% YoY. AI infrastructure consuming global capacity.`,
+    `<strong>NAND SOLD OUT:</strong> Every manufacturer at capacity through 2026. Samsung weighing 20-30% additional hikes.`,
+    `<strong>DDR5 4x SURGE:</strong> Prices quadrupled since Sep 2025. POS terminal builds directly impacted.`,
+    `<strong>SSD SHORTAGE:</strong> Consumer/enterprise NAND deprioritized. OEM wholesale doubled since late 2025.`,
+    `<strong>LEAD TIMES:</strong> Memory module allocation tightening. Recommend 6-month forward purchasing.`,
+    `<strong>AI IMPACT:</strong> Data center DRAM demand cannibalizing consumer supply. No relief expected until 2027.`,
+  ];
+
+  let html = `<div class="rama-header">
+    <div class="rama-title">RAMAGEDDON</div>
+    <div class="rama-subtitle">Memory & Storage Crisis Monitor // DDR4 \u2022 DDR5 \u2022 NAND \u2022 SSD \u2022 HDD</div>
+    <div class="rama-badge extreme">${level}</div>
+  </div>
+  <div class="rama-grid">`;
+
+  ramMats.slice(0,5).forEach(m => {
+    html += `<div class="rama-card">
+      <div class="rc-sym">${m.sym} <span class="rc-name">${m.name}</span></div>
+      <div class="rc-row"><span class="rc-price">${fmt(m.price)}</span><span style="font-size:10px;color:var(--muted)">${m.unit}</span><span class="rc-yoy">\u25B2 ${m.yoy}% YoY</span></div>
+      <div class="rc-note">${m.note}</div>
+      <div class="rc-chart"><canvas id="rama-chart-${m.sym}"></canvas></div>
+    </div>`;
+  });
+
+  html += `</div><div class="rama-news">`;
+  newsItems.forEach(n => { html += `<div class="rama-news-item">${n}</div>`; });
+  html += `</div>`;
+
+  document.getElementById('ramageddon').innerHTML = html;
+
+  // Draw sparklines for RAMAGEDDON cards
+  ramMats.slice(0,5).forEach(m => {
+    const c = document.getElementById(`rama-chart-${m.sym}`);
+    if (c) drawSparkline(c, m.history.slice(-30), '#ff3366');
+  });
+}
+
+function renderMasterChart() {
+  const section = document.getElementById('masterChartSection');
+  if (!state.length) { section.style.display='none'; return; }
+  // Respect kiosk flex layout vs normal block
+  section.style.display = document.body.classList.contains('kiosk') ? 'flex' : 'block';
+
+  const cats = [...new Set(state.map(m=>m.cat))];
+  const catLabels = {memory:'Memory & Storage',metals:'Metals',semicon:'Semiconductors',displays:'Displays',payment:'Payment Modules',plastics:'Plastics & PCB',thermal:'Thermal Print',networking:'Network',power:'Power'};
+  const catData = cats.map(c => {
+    const items = state.filter(m=>m.cat===c);
+    const avgYoY = items.reduce((a,m)=>a+m.yoy,0)/items.length;
+    return { cat:c, label:catLabels[c]||c, yoy:avgYoY, color:catColor(c), count:items.length };
+  }).sort((a,b)=>b.yoy-a.yoy);
+
+  const maxAbs = Math.max(...catData.map(d=>Math.abs(d.yoy)), 10);
+  // In kiosk, measure actual chart container height; otherwise use 120px default
+  const chartEl = document.getElementById('masterChart');
+  const chartHeight = document.body.classList.contains('kiosk') ? Math.max(chartEl.clientHeight - 56, 60) : 120;
+
+  let html = '<div class="mc-zero"></div>';
+  catData.forEach(d => {
+    const pct = Math.abs(d.yoy) / maxAbs;
+    const barH = Math.max(pct * chartHeight, 4);
+    const isNeg = d.yoy < 0;
+    const valColor = d.yoy > 30 ? 'var(--red)' : d.yoy > 10 ? 'var(--yellow)' : d.yoy > 0 ? 'var(--text)' : 'var(--green)';
+    html += `<div class="master-bar-wrap">
+      <div class="master-bar ${isNeg?'negative':''}" style="height:${barH}px;background:${d.color};box-shadow:0 0 12px ${d.color}30" title="${d.label.replace(/\n/g,' ')}: ${d.yoy>0?'+':''}${d.yoy.toFixed(1)}% YoY (${d.count} materials)">
+        <div class="mb-val" style="color:${valColor}">${d.yoy>0?'+':''}${d.yoy.toFixed(0)}%</div>
+      </div>
+      <div class="master-bar-label">${d.label}</div>
+    </div>`;
+  });
+
+  chartEl.innerHTML = html;
+}
+
+// ================================================================
+//  OUTLOOK / OPTIMISM METER
+//  Forward-looking sentiment per category. Pre-loaded with real
+//  analyst outlook, editable by clicking any card.
+// ================================================================
+const DEFAULT_OUTLOOK = {
+  memory: { score: 35, intel: '<strong>Cautiously improving.</strong> DRAM contract prices may stabilize Q3 2026 as new Samsung/SK Hynix HBM fabs come online. But AI demand keeps absorbing capacity — consumer DRAM remains deprioritized. NAND may ease late 2026.', updated: 'Apr 2026' },
+  metals: { score: 40, intel: '<strong>Mixed signals.</strong> Copper supply from Chile/Peru recovering. Gold likely stays elevated on geopolitical uncertainty. Tin correcting from Jan highs. Steel steady with infrastructure spend.', updated: 'Apr 2026' },
+  semicon: { score: 25, intel: '<strong>Challenging outlook.</strong> Foundry capacity locked by AI through 2027. TI/NXP/Infineon price hikes baked in for the year. Mature-node shortage is structural, not cyclical. Lead times not improving.', updated: 'Apr 2026' },
+  displays: { score: 55, intel: '<strong>Stable to positive.</strong> LCD panel supply balanced. No major shortages expected. Touch digitizer supply healthy. LED costs continuing to decline. Good category for cost control.', updated: 'Apr 2026' },
+  payment: { score: 50, intel: '<strong>Neutral.</strong> EMV/NFC module supply adequate. PCI compliance cycle driving steady demand but no shortages. Contactless adoption growing but supply keeping pace.', updated: 'Apr 2026' },
+  plastics: { score: 60, intel: '<strong>Favorable.</strong> ABS and polycarbonate feedstock costs stabilizing. Weak industrial demand keeping prices in check. PCB laminate supply mature and reliable. Best cost outlook of all categories.', updated: 'Apr 2026' },
+  thermal: { score: 65, intel: '<strong>Very stable.</strong> Thermal paper and print head supply chains are mature, commodity-grade. No disruptions expected. Lowest risk category in your portfolio.', updated: 'Apr 2026' },
+  networking: { score: 45, intel: '<strong>Moderate concern.</strong> WiFi 6 module demand growing. Ethernet PHY ICs caught in broader semiconductor shortage. Cable costs tracking copper. Mixed but manageable.', updated: 'Apr 2026' },
+  power: { score: 55, intel: '<strong>Stable.</strong> Power supplies are commodity. Li-ion cells seeing modest increases from EV demand spillover but adequate supply for POS volumes. UPS pricing flat.', updated: 'Apr 2026' },
+};
+
+// Outlook state — loaded from localStorage if available
+let outlookState = {};
+function loadOutlook() {
+  try {
+    const saved = localStorage.getItem('cogs-outlook');
+    if (saved) outlookState = JSON.parse(saved);
+  } catch(e) {}
+  // Merge defaults for any missing categories
+  Object.keys(DEFAULT_OUTLOOK).forEach(k => {
+    if (!outlookState[k]) outlookState[k] = { ...DEFAULT_OUTLOOK[k] };
+  });
+}
+function saveOutlook() {
+  try { localStorage.setItem('cogs-outlook', JSON.stringify(outlookState)); } catch(e) {}
+}
+loadOutlook();
+
+function sentimentLabel(score) {
+  if (score >= 70) return { text: 'VERY BULLISH', cls: 'very-bullish' };
+  if (score >= 55) return { text: 'BULLISH', cls: 'bullish' };
+  if (score >= 45) return { text: 'NEUTRAL', cls: 'neutral' };
+  if (score >= 30) return { text: 'BEARISH', cls: 'bearish' };
+  return { text: 'VERY BEARISH', cls: 'very-bearish' };
+}
+
+function sentimentEmoji(score) {
+  if (score >= 70) return '\u{2600}\u{FE0F}'; // sun
+  if (score >= 55) return '\u{26C5}'; // sun behind cloud
+  if (score >= 45) return '\u{2601}\u{FE0F}'; // cloud
+  if (score >= 30) return '\u{1F327}\u{FE0F}'; // rain
+  return '\u{26A1}'; // lightning
+}
+
+function renderOutlook() {
+  const section = document.getElementById('outlookSection');
+  const cats = [...new Set(state.map(m => m.cat))];
+  if (!cats.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const catLabels = {memory:'Memory & Storage',metals:'Metals',semicon:'Semiconductors',displays:'Displays',payment:'Payment Modules',plastics:'Plastics & PCB',thermal:'Thermal Print',networking:'Networking',power:'Power'};
+
+  let html = `<div class="outlook-header">
+    <div class="outlook-title">OUTLOOK // OPTIMISM METER</div>
+    <div class="outlook-legend">
+      <span><span class="dot" style="background:var(--red)"></span> Bearish (costs staying high)</span>
+      <span><span class="dot" style="background:var(--yellow)"></span> Cautious</span>
+      <span><span class="dot" style="background:var(--green)"></span> Bullish (relief coming)</span>
+      <span style="color:var(--cyan)">Click any card to update</span>
+    </div>
+  </div>
+  <div class="outlook-grid">`;
+
+  cats.forEach(cat => {
+    const o = outlookState[cat] || DEFAULT_OUTLOOK[cat] || { score: 50, intel: 'No intel available.', updated: 'N/A' };
+    const s = sentimentLabel(o.score);
+    const emoji = sentimentEmoji(o.score);
+    const items = state.filter(m => m.cat === cat);
+    const avgYoY = items.reduce((a,m) => a + m.yoy, 0) / items.length;
+    const markerLeft = Math.max(2, Math.min(o.score, 98));
+
+    html += `<div class="outlook-card" data-cat="${cat}">
+      <div class="oc-top">
+        <div class="oc-cat" style="color:${catColor(cat)}">${emoji} ${catLabels[cat] || cat}</div>
+        <div class="oc-sentiment-label ${s.cls}">${s.text}</div>
+      </div>
+      <div class="oc-gauge">
+        <div class="oc-gauge-track"></div>
+        <div class="oc-gauge-marker" style="left:calc(${markerLeft}% - 8px)"></div>
+      </div>
+      <div class="oc-gauge-labels"><span>BEARISH</span><span>NEUTRAL</span><span>BULLISH</span></div>
+      <div class="oc-intel">${o.intel}</div>
+      <div class="oc-meta">
+        <div class="oc-yoy-vs">
+          <span>Now: <strong style="color:${avgYoY > 0 ? 'var(--red)' : 'var(--green)'}">${avgYoY > 0 ? '+' : ''}${avgYoY.toFixed(0)}% YoY</strong></span>
+          <span class="oc-arrow">${o.score >= 50 ? '\u{2192}\u{1F4C9}' : '\u{2192}\u{1F4C8}'}</span>
+          <span>Outlook: <strong style="color:${o.score >= 50 ? 'var(--green)' : 'var(--red)'}">${o.score >= 50 ? 'Improving' : 'Worsening'}</strong></span>
+        </div>
+        <div class="oc-edit-hint">Click to edit outlook</div>
+      </div>
+      <div class="oc-editor">
+        <div class="oc-slider-row">
+          <label>Sentiment:</label>
+          <input type="range" class="oc-slider" min="0" max="100" value="${o.score}" data-cat="${cat}">
+          <span class="oc-slider-val" style="font-family:'Orbitron',sans-serif;font-size:12px;color:var(--cyan);min-width:30px">${o.score}</span>
+        </div>
+        <textarea class="oc-note-input" data-cat="${cat}" placeholder="Add your notes... e.g. 'Heard from Samsung rep that NAND allocation improving Q3'">${o.customNote || ''}</textarea>
+        <button class="oc-save-btn" data-cat="${cat}">\u2713 Save Outlook</button>
+      </div>
+    </div>`;
+  });
+
+  html += '</div>';
+  section.innerHTML = html;
+
+  // Wire up click-to-edit
+  section.querySelectorAll('.outlook-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.oc-editor')) return; // don't toggle when interacting with editor
+      card.classList.toggle('editing');
+    });
+  });
+
+  // Wire up sliders
+  section.querySelectorAll('.oc-slider').forEach(slider => {
+    slider.addEventListener('input', (e) => {
+      e.stopPropagation();
+      const cat = slider.dataset.cat;
+      const val = parseInt(slider.value);
+      slider.closest('.oc-editor').querySelector('.oc-slider-val').textContent = val;
+    });
+    slider.addEventListener('click', e => e.stopPropagation());
+  });
+
+  // Wire up textareas
+  section.querySelectorAll('.oc-note-input').forEach(ta => {
+    ta.addEventListener('click', e => e.stopPropagation());
+  });
+
+  // Wire up save buttons
+  section.querySelectorAll('.oc-save-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const cat = btn.dataset.cat;
+      const card = btn.closest('.outlook-card');
+      const slider = card.querySelector('.oc-slider');
+      const textarea = card.querySelector('.oc-note-input');
+      const newScore = parseInt(slider.value);
+      const customNote = textarea.value.trim();
+
+      if (!outlookState[cat]) outlookState[cat] = { ...DEFAULT_OUTLOOK[cat] };
+      outlookState[cat].score = newScore;
+      // Sanitize user input to prevent XSS
+      const safeNote = customNote.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      outlookState[cat].customNote = safeNote;
+      outlookState[cat].updated = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'America/Los_Angeles' });
+
+      // If user added a custom note, prepend it to the intel
+      if (safeNote) {
+        outlookState[cat].intel = `<strong>Your note:</strong> ${safeNote}<br><br>${DEFAULT_OUTLOOK[cat]?.intel || ''}`;
+      }
+
+      saveOutlook();
+      card.classList.remove('editing');
+      renderOutlook();
+      addAlert(`Outlook updated: <strong>${cat.toUpperCase()}</strong> sentiment set to ${sentimentLabel(newScore).text} (${newScore}/100)`, 'info');
+    });
+  });
+}
+
+function renderAll(includeOutlook) {
+  renderTicker(); renderRamageddon(); renderMasterChart(); renderScoreBar(); renderCards(); renderRiskGrid(); renderLeaderboard(); renderSources();
+  if (includeOutlook) renderOutlook();
+}
+
+// Card click for detail
+document.addEventListener('click', e=>{
+  const card=e.target.closest('.material-card');if(!card)return;
+  const sym=card.dataset.sym;const m=state.find(s=>s.sym===sym);if(!m)return;
+  const existing=card.querySelector('.card-tooltip');if(existing){existing.remove();return}
+  const tip=document.createElement('div');tip.className='card-tooltip';
+  tip.style.cssText='padding:10px;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;line-height:1.6;color:var(--muted)';
+  tip.innerHTML=`<div style="color:var(--text);font-weight:600;margin-bottom:4px">${m.name} \u2014 Intelligence</div><div>${m.note}</div><div style="margin-top:6px;font-size:10px;opacity:.7">Source: ${m.source} \u2022 Impact: ${m.impact.toUpperCase()} \u2022 YoY: ${m.yoy>0?'+':''}${m.yoy}%</div>${m.productLabels.length?`<div style="margin-top:6px;font-size:10px;color:var(--cyan)">Affects: ${m.productLabels.join(', ')}</div>`:''}`;
+  card.appendChild(tip);
+});
+
+// Tick simulation — threshold-based alerts
+const thresholdFired = new Set(); // track which materials already fired to avoid spam
+
+function getThresholds() {
+  return {
+    critical: parseFloat(document.getElementById('threshCritical')?.value) || 80,
+    warning: parseFloat(document.getElementById('threshWarning')?.value) || 30,
+    opportunity: parseFloat(document.getElementById('threshOpportunity')?.value) || -0.5
+  };
+}
+
+// Persist thresholds
+document.getElementById('threshCritical')?.addEventListener('change', () => { try{localStorage.setItem('cogs-thresh-critical',document.getElementById('threshCritical').value)}catch(e){} });
+document.getElementById('threshWarning')?.addEventListener('change', () => { try{localStorage.setItem('cogs-thresh-warning',document.getElementById('threshWarning').value)}catch(e){} });
+document.getElementById('threshOpportunity')?.addEventListener('change', () => { try{localStorage.setItem('cogs-thresh-opp',document.getElementById('threshOpportunity').value)}catch(e){} });
+// Restore thresholds
+try {
+  const tc=localStorage.getItem('cogs-thresh-critical'); if(tc) document.getElementById('threshCritical').value=tc;
+  const tw=localStorage.getItem('cogs-thresh-warning'); if(tw) document.getElementById('threshWarning').value=tw;
+  const to=localStorage.getItem('cogs-thresh-opp'); if(to) document.getElementById('threshOpportunity').value=to;
+} catch(e){}
+
+const ALERT_TEMPLATES = [
+  { type:'info', gen:m=>`<strong>${m.sym}</strong> ${m.cat.toUpperCase()} sector update: ${m.trend} pressure. ${m.productLabels.length?m.productLabels.length+' product lines affected.':''}` },
+];
+
+function tick() {
+  const thresh = getThresholds();
+  state.forEach(m=>{
+    const bias=m.trend==='up'?0.002:m.trend==='down'?-0.0015:0;
+    const change=((Math.random()-0.48)*m.vol+bias)*m.price*0.15;
+    m.prevPrice=m.price; m.price=Math.max(m.price*0.5,m.price+change);
+    m.history.push(m.price); if(m.history.length>90)m.history.shift();
+    m.dayChange=((m.price-m.dayStart)/m.dayStart)*100;
+    if((change>0&&m.streakDir==='up')||(change<0&&m.streakDir==='down'))m.streak++;
+    else{m.streak=1;m.streakDir=change>=0?'up':'down'}
+  });
+  state.forEach(m=>{
+    const card=document.querySelector(`.material-card[data-sym="${m.sym}"]`);
+    if(card&&Math.abs(m.price-m.prevPrice)/m.prevPrice>0.002){
+      card.classList.remove('flash-green','flash-red');void card.offsetWidth;
+      card.classList.add(m.price>m.prevPrice?'flash-red':'flash-green');
+    }
+  });
+
+  // Threshold-based alerts
+  state.forEach(m => {
+    const critKey = `crit-${m.sym}`, warnKey = `warn-${m.sym}`, oppKey = `opp-${m.sym}`;
+    if (m.yoy >= thresh.critical && !thresholdFired.has(critKey)) {
+      thresholdFired.add(critKey);
+      addAlert(`<strong>${m.sym}</strong> \u2014 ${m.name} at +${m.yoy.toFixed(0)}% YoY, crossed critical threshold (${thresh.critical}%). ${m.productLabels.length?'Impacts: '+m.productLabels.slice(0,2).join(', ')+'.':'Monitor closely.'}`, 'critical');
+    } else if (m.yoy < thresh.critical) { thresholdFired.delete(critKey); }
+
+    if (m.yoy >= thresh.warning && m.yoy < thresh.critical && !thresholdFired.has(warnKey)) {
+      thresholdFired.add(warnKey);
+      addAlert(`<strong>${m.name}</strong> hit +${m.yoy.toFixed(0)}% YoY, crossed warning threshold (${thresh.warning}%). ${m.productLabels.length?'Check '+m.productLabels[0]+' procurement.':''}`, 'warning');
+    } else if (m.yoy < thresh.warning) { thresholdFired.delete(warnKey); }
+
+    if (m.dayChange <= thresh.opportunity && !thresholdFired.has(oppKey)) {
+      thresholdFired.add(oppKey);
+      addAlert(`<strong>${m.name}</strong> dipped ${m.dayChange.toFixed(2)}% today. ${m.productLabels.length?'Potential buying window for '+m.productLabels[0]+' builds.':''}`, 'opportunity');
+    } else if (m.dayChange > thresh.opportunity) { thresholdFired.delete(oppKey); }
+  });
+
+  // Occasional general info alerts
+  if(Math.random()<0.05){
+    const pool=state.filter(m=>m.impact==='high'||m.impact==='critical');
+    if(pool.length){const m=pool[Math.floor(Math.random()*pool.length)];const t=ALERT_TEMPLATES[0];addAlert(t.gen(m),t.type)}
+  }
+  renderAll();
+}
+
+// Redraw chart on resize (important for kiosk on different TV sizes)
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (state.length) { renderMasterChart(); renderCards(); } }, 400);
+});
+
+// Clock
+function updateClock(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/Los_Angeles'})+'  PST'}
+setInterval(updateClock,1000); updateClock();
+
+// ================================================================
+//  UPLOAD FLOW
+// ================================================================
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('uploadBox').style.display='none';
+    const proc=document.getElementById('processing');proc.classList.add('active');
+    const log=document.getElementById('procLog');
+
+    setTimeout(()=>{
+      const csv = parseCSV(e.target.result);
+      const analysis = analyzeCSV(csv);
+      const allMatSyms = new Set();
+      const matProdMap = new Map();
+
+      analysis.materialHits.forEach((prodLabels, sym) => {
+        allMatSyms.add(sym);
+        matProdMap.set(sym, prodLabels);
+      });
+
+      // Animate log
+      let i=0;
+      const showNext=()=>{
+        if(i<analysis.log.length){
+          const entry=analysis.log[i];
+          const div=document.createElement('div');div.className=entry.cls;div.textContent=entry.text;log.appendChild(div);log.scrollTop=log.scrollHeight;
+          i++;setTimeout(showNext,200);
+        } else {
+          setTimeout(()=>{
+            document.getElementById('uploadOverlay').classList.add('hidden');
+            initDashboard(allMatSyms, analysis.productMap, matProdMap);
+          },800);
+        }
+      };
+      showNext();
+    },300);
+  };
+  reader.readAsText(file);
+}
+
+// Drag & drop
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('dragover')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files.length)processFile(e.dataTransfer.files[0])});
+fileInput.addEventListener('change',e=>{if(e.target.files.length)processFile(e.target.files[0])});
+
+// Skip = demo catalog
+document.getElementById('skipBtn').addEventListener('click',()=>{
+  const demoCSV = `SKU,Product Name,Category,Description,Qty On Hand
+POS-T100,15" Touchscreen POS Terminal,POS Terminal,All-in-one POS with i5 processor and 15" capacitive touchscreen,48
+POS-T200,22" Self-Service Kiosk,Kiosk,Customer-facing self-checkout kiosk with payment integration,12
+PIN-V400,Verifone P400 PIN Pad,Payment,EMV chip and contactless NFC payment terminal,156
+PIN-D200,Dejavoo Z11 Payment Terminal,Payment,Android smart payment terminal with touchscreen,88
+SCN-1950,Honeywell 1950g 2D Scanner,Scanner,Handheld 2D barcode imager USB,210
+SCN-DS22,Zebra DS2208 Scanner,Scanner,General purpose 1D/2D scanner,175
+SCN-FS10,In-counter Flush Scanner,Scanner,Fixed mount 2D presentation barcode scanner,45
+PRT-T88,Epson TM-T88VII Receipt Printer,Printer,80mm thermal receipt printer with auto-cutter,134
+PRT-SP7,Star TSP700II Label Printer,Printer,Thermal label and receipt printer,67
+PRT-CT,Citizen CT-S310II Thermal Printer,Printer,Compact thermal receipt printer 80mm,42
+DRW-C100,APG VBS320 Cash Drawer,Cash Drawer,Heavy duty 16" steel cash drawer,98
+DRW-C200,MMF Val-u Line Cash Drawer,Cash Drawer,Standard duty cash drawer,145
+RAM-8G,DDR4 8GB SO-DIMM 3200MHz,Memory,RAM upgrade module for POS terminals,320
+RAM-16G,DDR4 16GB SO-DIMM 3200MHz,Memory,RAM upgrade module high capacity,180
+RAM-D5,DDR5 16GB SO-DIMM 4800MHz,Memory,Next-gen RAM for new POS builds,75
+SSD-256,256GB NVMe M.2 SSD,Storage,Primary storage for POS terminal,240
+SSD-512,512GB NVMe M.2 SSD,Storage,Extended storage for POS terminal,160
+HDD-1T,1TB 2.5" SATA HDD,Storage,Bulk storage hard drive,95
+DSP-15,15" Customer Display Monitor,Display,Secondary LCD customer-facing display,110
+DSP-10,10.1" Pole Display LCD,Display,Customer pole-mount touchscreen display,85
+DSP-VFD,VFD Customer Pole Display,Display,2-line vacuum fluorescent display,64
+PPR-80,Thermal Paper 3-1/8 x 230 (50pk),Supplies,Standard POS receipt paper rolls case,580
+PPR-58,Thermal Paper 58mm x 50m (100pk),Supplies,Compact thermal paper rolls,220
+NET-SW8,8-Port Gigabit Network Switch,Networking,Unmanaged ethernet switch for POS network,78
+NET-AP,WiFi 6 Access Point,Networking,Wireless access point for mobile POS,35
+NET-CAT6,Cat6 Ethernet Cable 10ft,Networking,Network patch cable,450
+PWR-UPS,APC UPS 600VA,Power,Battery backup for POS terminal,65
+PWR-12V,12V 5A Power Adapter,Power,Replacement power supply for terminals,120
+TAB-A10,10" Android POS Tablet,Tablet,Mobile POS tablet with NFC reader built-in,55
+TAB-SLD,Tablet Stand with Swivel,Tablet,Aluminum counter mount for POS tablets,55
+KBD-P50,Programmable POS Keyboard 50-key,Peripheral,Cherry MX programmable keyboard,42
+MSE-USB,USB Optical Mouse,Peripheral,Standard USB mouse,200
+MB-J6,Mini-ITX Motherboard J6413,Motherboard,Embedded Celeron mini-ITX for POS builds,38
+MB-I5,Mini-ITX Motherboard i5-1235U,Motherboard,Performance embedded board for POS,22`;
+  const blob = new Blob([demoCSV], {type:'text/csv'});
+  const file = new File([blob], 'demo_pos_catalog.csv', {type:'text/csv'});
+  processFile(file);
+});
+
+// Reload CSV button
+document.getElementById('reloadCsv').addEventListener('click',()=>{
+  if(tickInterval)clearInterval(tickInterval);
+  document.getElementById('dashboard').classList.remove('active');
+  document.getElementById('uploadOverlay').classList.remove('hidden');
+  document.getElementById('uploadBox').style.display='';
+  document.getElementById('processing').classList.remove('active');
+  document.getElementById('procLog').innerHTML='';
+  state=[];activeFilter='all';activeProduct='all';alertCount=0;
+});
+
+// ================================================================
+//  SETTINGS PANEL & KIOSK MODE
+// ================================================================
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const settingsClose = document.getElementById('settingsClose');
+const kioskToggle = document.getElementById('kioskToggle');
+const autoScrollToggle = document.getElementById('autoScrollToggle');
+const tickerSpeedSel = document.getElementById('tickerSpeed');
+const kioskRamaToggle = document.getElementById('kioskRamaToggle');
+const kioskChartToggle = document.getElementById('kioskChartToggle');
+const kioskOutlookToggle = document.getElementById('kioskOutlookToggle');
+const kioskCardsToggle = document.getElementById('kioskCardsToggle');
+
+let kioskMode = false;
+let autoScrollInterval = null;
+
+// Export CSV
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!state.length) return;
+  const header = 'Symbol,Name,Category,Price,Unit,YoY%,Day Change%,Trend,Impact,Source,Products';
+  const rows = state.map(m => {
+    const prods = (m.productLabels||[]).join('; ');
+    return [m.sym, `"${m.name}"`, m.cat, m.price.toFixed(4), m.unit, m.yoy.toFixed(1), m.dayChange.toFixed(2), m.trend, m.impact, m.source, `"${prods}"`].join(',');
+  });
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cogs-export-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+function openSettings() {
+  settingsPanel.classList.add('open');
+  settingsOverlay.classList.add('open');
+  if (typeof resetSettingsIdleTimer === 'function') resetSettingsIdleTimer();
+}
+function closeSettings() {
+  settingsPanel.classList.remove('open');
+  settingsOverlay.classList.remove('open');
+  if (typeof settingsIdleTimer !== 'undefined') clearTimeout(settingsIdleTimer);
+}
+
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', closeSettings);
+
+// Kiosk toggle
+kioskToggle.addEventListener('change', () => {
+  kioskMode = kioskToggle.checked;
+  document.body.classList.toggle('kiosk', kioskMode);
+  document.getElementById('kioskIndicator').style.display = kioskMode ? 'flex' : 'none';
+
+  if (kioskMode) {
+    closeSettings();
+  }
+  applyKioskSections();
+  // Save preference
+  try { localStorage.setItem('cogs-kiosk', kioskMode ? '1' : '0'); } catch(e){}
+});
+
+// ESC to exit kiosk
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (settingsPanel.classList.contains('open')) { closeSettings(); return; }
+    if (kioskMode) {
+      kioskMode = false;
+      kioskToggle.checked = false;
+      document.body.classList.remove('kiosk');
+      document.getElementById('kioskIndicator').style.display = 'none';
+      applyKioskSections();
+      try { localStorage.setItem('cogs-kiosk', '0'); } catch(e){}
+    }
+  }
+});
+
+// Auto-scroll cards in kiosk mode
+function startAutoScroll() {
+  if (!autoScrollToggle.checked || !kioskMode) return;
+  stopAutoScroll();
+  autoScrollInterval = setInterval(() => {
+    const area = document.querySelector('.cards-area');
+    if (!area) return;
+    const cardH = area.querySelector('.material-card')?.offsetHeight || 200;
+    const maxScroll = area.scrollHeight - area.clientHeight;
+    if (area.scrollTop >= maxScroll - 10) {
+      area.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      area.scrollBy({ top: cardH + 12, behavior: 'smooth' });
+    }
+  }, 10000);
+}
+function stopAutoScroll() {
+  if (autoScrollInterval) { clearInterval(autoScrollInterval); autoScrollInterval = null; }
+}
+
+autoScrollToggle.addEventListener('change', () => {
+  if (autoScrollToggle.checked && kioskMode) startAutoScroll();
+  else stopAutoScroll();
+});
+
+// Kiosk section visibility toggles
+function applyKioskSections() {
+  if (!kioskMode) {
+    // Restore all sections in normal mode
+    document.getElementById('ramageddon').style.display = '';
+    document.getElementById('masterChartSection').style.display = '';
+    document.getElementById('outlookSection').style.display = '';
+    document.querySelector('.main').style.display = '';
+    return;
+  }
+  // In kiosk: .main is hidden by CSS. Toggle the visible kiosk sections:
+  document.getElementById('ramageddon').style.display = kioskRamaToggle.checked ? '' : 'none';
+  document.getElementById('masterChartSection').style.display = kioskChartToggle.checked ? 'flex' : 'none';
+  document.getElementById('outlookSection').style.display = kioskOutlookToggle.checked ? '' : 'none';
+  // Re-render chart to pick up dynamic kiosk height
+  if (kioskChartToggle.checked && typeof renderMasterChart === 'function') setTimeout(renderMasterChart, 50);
+}
+
+kioskRamaToggle.addEventListener('change', applyKioskSections);
+kioskChartToggle.addEventListener('change', applyKioskSections);
+kioskOutlookToggle.addEventListener('change', applyKioskSections);
+kioskCardsToggle.addEventListener('change', applyKioskSections);
+
+// Ticker speed
+tickerSpeedSel.addEventListener('change', () => {
+  const speed = tickerSpeedSel.value + 's';
+  document.querySelector('.ticker-track').style.animationDuration = speed;
+});
+
+// Font scale for TV viewing distance
+const fontScaleSel = document.getElementById('fontScale');
+fontScaleSel.addEventListener('change', () => {
+  const scale = fontScaleSel.value;
+  document.body.style.setProperty('--font-scale', scale);
+  document.querySelector('.dashboard-wrap').style.fontSize = (16 * parseFloat(scale)) + 'px';
+  // Persist
+  try { localStorage.setItem('cogs-fontscale', scale); } catch(e){}
+  // Redraw chart with new sizing
+  if (state.length) setTimeout(renderMasterChart, 100);
+});
+// Restore font scale
+try {
+  const savedScale = localStorage.getItem('cogs-fontscale');
+  if (savedScale) {
+    fontScaleSel.value = savedScale;
+    document.body.style.setProperty('--font-scale', savedScale);
+    document.querySelector('.dashboard-wrap').style.fontSize = (16 * parseFloat(savedScale)) + 'px';
+  }
+} catch(e){}
+
+// Settings auto-close timeout in kiosk mode
+let settingsIdleTimer;
+function resetSettingsIdleTimer() {
+  clearTimeout(settingsIdleTimer);
+  if (kioskMode && settingsPanel.classList.contains('open')) {
+    settingsIdleTimer = setTimeout(closeSettings, 60000);
+  }
+}
+settingsPanel.addEventListener('mousemove', resetSettingsIdleTimer);
+settingsPanel.addEventListener('click', resetSettingsIdleTimer);
+settingsPanel.addEventListener('input', resetSettingsIdleTimer);
+
+// Restore kiosk state from localStorage
+try {
+  if (localStorage.getItem('cogs-kiosk') === '1') {
+    kioskToggle.checked = true;
+    kioskMode = true;
+    document.body.classList.add('kiosk');
+    document.getElementById('kioskIndicator').style.display = 'flex';
+  }
+} catch(e){}
+</script>
+</body>
+</html>
