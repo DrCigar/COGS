@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>POS Supply Chain // COGS Command Center</title>
+<title>Supply Chain COGS</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;400;700&family=Inter:wght@300;400;600;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box}
@@ -440,8 +440,9 @@
 
 <div class="header">
   <div class="header-left">
-    <h1>POS SUPPLY CHAIN // COGS</h1>
+    <h1>SUPPLY CHAIN COGS</h1>
     <div class="sub" id="headerSub">Point-of-Sale Systems &bull; Components &amp; Raw Materials &bull; Real-Time Index</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:1px;margin-top:2px;opacity:.6">developed by LOVEANDNATE</div>
   </div>
   <div class="header-right">
     <div class="market-status open">MARKETS ACTIVE</div>
@@ -562,9 +563,30 @@
       </div>
     </div>
     <div class="settings-group">
+      <div class="settings-group-title">PRODUCT CATALOG</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Upload a CSV to customize which materials the dashboard tracks based on your products.</div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Upload CSV</div>
+          <div class="so-desc">Drop or select a product catalog file.</div>
+        </div>
+        <label style="cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cyan);transition:all .2s" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--border)'">
+          BROWSE
+          <input type="file" id="settingsFileInput" accept=".csv,.tsv,.txt" style="display:none">
+        </label>
+      </div>
+      <div class="settings-option">
+        <div>
+          <div class="so-label">Reset to Demo Catalog</div>
+          <div class="so-desc">Load the built-in POS product catalog.</div>
+        </div>
+        <button id="settingsReloadDemo" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--yellow);cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--yellow)'" onmouseout="this.style.borderColor='var(--border)'">RESET</button>
+      </div>
+    </div>
+    <div class="settings-group">
       <div class="settings-group-title">ABOUT</div>
       <div style="font-size:11px;color:var(--muted);line-height:1.8;font-family:'JetBrains Mono',monospace">
-        POS Supply Chain COGS Command Center<br>
+        Supply Chain COGS<br>
         Material pricing baseline: April 2026<br>
         Sources: TrendForce, Trading Economics, Metalary, ChemOrbis, J2 Sourcing<br>
         Simulation tick: 3 seconds
@@ -1487,9 +1509,9 @@ dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('dragover'))
 dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('dragover');if(e.dataTransfer.files.length)processFile(e.dataTransfer.files[0])});
 fileInput.addEventListener('change',e=>{if(e.target.files.length)processFile(e.target.files[0])});
 
-// Skip = demo catalog
-document.getElementById('skipBtn').addEventListener('click',()=>{
-  const demoCSV = `SKU,Product Name,Category,Description,Qty On Hand
+// Demo catalog CSV
+function getDemoCSV() {
+  return `SKU,Product Name,Category,Description,Qty On Hand
 POS-T100,15" Touchscreen POS Terminal,POS Terminal,All-in-one POS with i5 processor and 15" capacitive touchscreen,48
 POS-T200,22" Self-Service Kiosk,Kiosk,Customer-facing self-checkout kiosk with payment integration,12
 PIN-V400,Verifone P400 PIN Pad,Payment,EMV chip and contactless NFC payment terminal,156
@@ -1524,20 +1546,44 @@ KBD-P50,Programmable POS Keyboard 50-key,Peripheral,Cherry MX programmable keybo
 MSE-USB,USB Optical Mouse,Peripheral,Standard USB mouse,200
 MB-J6,Mini-ITX Motherboard J6413,Motherboard,Embedded Celeron mini-ITX for POS builds,38
 MB-I5,Mini-ITX Motherboard i5-1235U,Motherboard,Performance embedded board for POS,22`;
-  const blob = new Blob([demoCSV], {type:'text/csv'});
+}
+
+function loadDemoCatalog() {
+  const blob = new Blob([getDemoCSV()], {type:'text/csv'});
   const file = new File([blob], 'demo_pos_catalog.csv', {type:'text/csv'});
   processFile(file);
+}
+
+// Skip button (still works if overlay is shown)
+document.getElementById('skipBtn').addEventListener('click', loadDemoCatalog);
+
+// Auto-load demo catalog on page load — skip the upload overlay
+document.getElementById('uploadOverlay').classList.add('hidden');
+loadDemoCatalog();
+
+// Settings: CSV upload
+document.getElementById('settingsFileInput').addEventListener('change', e => {
+  if (e.target.files.length) {
+    if(tickInterval) clearInterval(tickInterval);
+    state=[]; activeFilter='all'; activeProduct='all'; alertCount=0;
+    processFile(e.target.files[0]);
+    closeSettings();
+  }
 });
 
-// Reload CSV button
+// Settings: Reset to demo catalog
+document.getElementById('settingsReloadDemo').addEventListener('click', () => {
+  if(tickInterval) clearInterval(tickInterval);
+  state=[]; activeFilter='all'; activeProduct='all'; alertCount=0;
+  loadDemoCatalog();
+  closeSettings();
+});
+
+// Reload CSV button (in filter bar)
 document.getElementById('reloadCsv').addEventListener('click',()=>{
   if(tickInterval)clearInterval(tickInterval);
-  document.getElementById('dashboard').classList.remove('active');
-  document.getElementById('uploadOverlay').classList.remove('hidden');
-  document.getElementById('uploadBox').style.display='';
-  document.getElementById('processing').classList.remove('active');
-  document.getElementById('procLog').innerHTML='';
   state=[];activeFilter='all';activeProduct='all';alertCount=0;
+  openSettings();
 });
 
 // ================================================================
