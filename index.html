@@ -220,7 +220,8 @@
   .master-chart-title{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;color:var(--cyan);margin-bottom:14px}
   .master-chart{display:flex;align-items:flex-end;gap:10px;height:160px;padding-bottom:30px;position:relative}
   .master-chart .mc-zero{position:absolute;bottom:24px;left:0;right:0;height:1px;background:rgba(255,255,255,0.08)}
-  .master-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;position:relative}
+  .master-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;position:relative;transition:transform .2s}
+  .master-bar-wrap:hover{transform:translateY(-2px)}
   .master-bar{width:100%;max-width:64px;border-radius:4px 4px 0 0;transition:height .5s;position:relative;min-height:2px;cursor:pointer}
   .master-bar:hover{filter:brightness(1.3)}
   .master-bar .mb-val{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;white-space:nowrap}
@@ -1341,7 +1342,7 @@ function renderMasterChart() {
     const barH = Math.max(pct * chartHeight, 4);
     const isNeg = d.yoy < 0;
     const valColor = d.yoy > 30 ? 'var(--red)' : d.yoy > 10 ? 'var(--yellow)' : d.yoy > 0 ? 'var(--text)' : 'var(--green)';
-    html += `<div class="master-bar-wrap">
+    html += `<div class="master-bar-wrap" data-cat="${d.cat}" style="cursor:pointer">
       <div class="master-bar ${isNeg?'negative':''}" style="height:${barH}px;background:${d.color};box-shadow:0 0 12px ${d.color}30" title="${d.label.replace(/\n/g,' ')}: ${d.yoy>0?'+':''}${d.yoy.toFixed(1)}% YoY (${d.count} materials)">
         <div class="mb-val" style="color:${valColor}">${d.yoy>0?'+':''}${d.yoy.toFixed(0)}%</div>
       </div>
@@ -1652,6 +1653,155 @@ function openDetail(sym) {
   });
 }
 
+function openCategoryDetail(cat) {
+  const catLabels = {memory:'Memory & Storage',metals:'Metals',semicon:'Semiconductors',displays:'Displays',payment:'Payment Modules',plastics:'Plastics & PCB',thermal:'Thermal Print',networking:'Network',power:'Power'};
+  const items = state.filter(m => m.cat === cat && !m._hidden).sort((a,b) => b.yoy - a.yoy);
+  if (!items.length) return;
+  const color = catColor(cat);
+  const avgYoY = items.reduce((a,m) => a + m.yoy, 0) / items.length;
+  const costUp = avgYoY >= 0;
+  const months = ['May 25','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan 26','Feb','Mar','Apr 26'];
+
+  // Top section
+  document.getElementById('detailTop').innerHTML = `
+    <div class="detail-sym">CATEGORY DRILLDOWN</div>
+    <div class="detail-name">${catLabels[cat] || cat}</div>
+    <div class="detail-stats">
+      <span class="detail-price">${items.length} materials</span>
+      <span class="detail-yoy ${costUp ? 'up' : 'down'}">Avg ${costUp ? '\u25B2 +' : '\u25BC '}${avgYoY.toFixed(1)}% YoY</span>
+    </div>`;
+
+  // Month labels
+  document.getElementById('detailMonths').innerHTML = months.map(mo => `<span>${mo}</span>`).join('');
+
+  // Build a composite chart — normalize each material's history to % change from month 0, then average
+  const normalized = items.map(m => m.history.map((v, i) => ((v - m.history[0]) / m.history[0]) * 100));
+  const avgCurve = [];
+  for (let i = 0; i < 13; i++) {
+    avgCurve.push(normalized.reduce((a, arr) => a + arr[i], 0) / normalized.length);
+  }
+
+  // Draw the category average trend
+  requestAnimationFrame(() => {
+    const canvas = document.getElementById('detailCanvas');
+    drawCategoryChart(canvas, avgCurve, items, color);
+  });
+
+  // Table of all materials in this category
+  let tableHtml = '<table><thead><tr><th>MATERIAL</th><th>CURRENT PRICE</th><th>YoY %</th><th>TREND</th><th>IMPACT</th></tr></thead><tbody>';
+  items.forEach(m => {
+    const up = m.yoy >= 0;
+    tableHtml += `<tr style="cursor:pointer" onclick="closeDetail();setTimeout(()=>openDetail('${m.sym}'),100)">
+      <td><strong style="color:${color}">${m.sym}</strong> ${m.name}</td>
+      <td>${fmt(m.price)} ${m.unit}</td>
+      <td class="mo-change ${up ? 'up' : 'down'}">${up ? '+' : ''}${m.yoy}%</td>
+      <td>${m.trend === 'up' ? '\u2191' : m.trend === 'down' ? '\u2193' : '\u2192'} ${m.trend}</td>
+      <td>${m.impact.toUpperCase()}</td>
+    </tr>`;
+  });
+  tableHtml += '</tbody></table>';
+  document.getElementById('detailTable').innerHTML = tableHtml;
+
+  // Info grid — category summary stats
+  const maxItem = items[0];
+  const minItem = items[items.length - 1];
+  const critCount = items.filter(m => m.impact === 'critical' || m.yoy > 100).length;
+  const highCount = items.filter(m => m.impact === 'high').length;
+  document.getElementById('detailInfo').innerHTML = `
+    <div class="detail-info-item"><strong>HIGHEST YoY</strong>${maxItem.sym} ${maxItem.name}: +${maxItem.yoy}%</div>
+    <div class="detail-info-item"><strong>LOWEST YoY</strong>${minItem.sym} ${minItem.name}: ${minItem.yoy > 0 ? '+' : ''}${minItem.yoy}%</div>
+    <div class="detail-info-item"><strong>RISK ITEMS</strong>${critCount} critical, ${highCount} high</div>
+    <div class="detail-info-item"><strong>SOURCES</strong>${[...new Set(items.map(m => m.source))].join(', ')}</div>`;
+
+  // Note
+  document.getElementById('detailNote').innerHTML = `<em>Category Intel:</em> ${items.length} materials tracked. Average YoY change +${avgYoY.toFixed(1)}%. Click any row above to see individual material detail.`;
+
+  detailOverlay.classList.add('open');
+}
+
+function drawCategoryChart(canvas, avgCurve, items, color) {
+  const dpr = window.devicePixelRatio || 1;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth * dpr;
+  const h = canvas.height = canvas.offsetHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const dw = canvas.offsetWidth, dh = canvas.offsetHeight;
+  ctx.clearRect(0, 0, dw, dh);
+
+  const padT = 30, padB = 10, chartH = dh - padT - padB;
+
+  // Collect all individual normalized curves for faint background lines
+  const allCurves = items.map(m => m.history.map((v, i) => ((v - m.history[0]) / m.history[0]) * 100));
+  const allVals = allCurves.flat().concat(avgCurve);
+  const min = Math.min(...allVals), max = Math.max(...allVals), range = max - min || 1;
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(dw, y); ctx.stroke();
+  }
+
+  // Y-axis labels (% change)
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '11px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  for (let i = 0; i <= 4; i++) {
+    const val = max - (range / 4) * i;
+    const y = padT + (chartH / 4) * i;
+    ctx.fillText((val >= 0 ? '+' : '') + val.toFixed(0) + '%', 4, y - 4);
+  }
+
+  // Zero line
+  const zeroY = padT + chartH - ((0 - min) / range) * chartH;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(dw, zeroY); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Individual material lines (faint)
+  allCurves.forEach(curve => {
+    ctx.beginPath();
+    curve.forEach((v, i) => {
+      const x = (i / (curve.length - 1)) * dw;
+      const y = padT + chartH - ((v - min) / range) * chartH;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color + '20';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+
+  // Average curve (bold)
+  const grad = ctx.createLinearGradient(0, padT, 0, dh);
+  grad.addColorStop(0, color + '25'); grad.addColorStop(1, color + '00');
+  ctx.beginPath(); ctx.moveTo(0, dh);
+  avgCurve.forEach((v, i) => {
+    const x = (i / (avgCurve.length - 1)) * dw;
+    const y = padT + chartH - ((v - min) / range) * chartH;
+    ctx.lineTo(x, y);
+  });
+  ctx.lineTo(dw, dh); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath();
+  avgCurve.forEach((v, i) => {
+    const x = (i / (avgCurve.length - 1)) * dw;
+    const y = padT + chartH - ((v - min) / range) * chartH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+
+  // Data points on average
+  avgCurve.forEach((v, i) => {
+    const x = (i / (avgCurve.length - 1)) * dw;
+    const y = padT + chartH - ((v - min) / range) * chartH;
+    ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = i === avgCurve.length - 1 ? color : 'var(--bg2)';
+    ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  });
+}
+
 function closeDetail() {
   detailOverlay.classList.remove('open');
 }
@@ -1659,6 +1809,8 @@ function closeDetail() {
 document.addEventListener('click', e => {
   const card = e.target.closest('.material-card') || e.target.closest('.rama-card[data-sym]');
   if (card && card.dataset.sym) { openDetail(card.dataset.sym); return; }
+  const bar = e.target.closest('.master-bar-wrap[data-cat]');
+  if (bar) { openCategoryDetail(bar.dataset.cat); return; }
 });
 
 detailClose.addEventListener('click', closeDetail);
