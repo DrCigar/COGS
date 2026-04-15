@@ -1156,7 +1156,7 @@ function renderScoreBar() {
     <div class="score-card purple"><div class="label">Avg YoY Change</div><div class="value">${avgYoY>=0?'+':''}${avgYoY.toFixed(1)}%</div><div class="detail">${filtered.length} materials tracked</div></div>
     <div class="score-card cyan"><div class="label">YoY Breadth</div><div class="value">${rising} \u2191 / ${falling} \u2193</div><div class="detail">${rising>falling?'Majority rising YoY':'Mixed or declining'}</div></div>
     <div class="score-card ${criticals>0?'red':'yellow'}"><div class="label">Risk Items</div><div class="value">${criticals}C / ${highImpact}H</div><div class="detail">${criticals} critical, ${highImpact} high</div></div>
-    <div class="score-card ${avgYoY>30?'red':avgYoY>10?'yellow':'green'}"><div class="label">Supply Chain Risk</div><div class="value">${avgYoY>30?'CRITICAL':avgYoY>15?'ELEVATED':avgYoY>5?'MODERATE':'NORMAL'}</div><div class="detail">Based on your catalog</div></div>`;
+    <div class="score-card ${avgYoY>50?'red':avgYoY>20?'yellow':'green'}"><div class="label">Supply Chain Risk</div><div class="value">${avgYoY>50?'CRITICAL':avgYoY>20?'ELEVATED':avgYoY>5?'MODERATE':'NORMAL'}</div><div class="detail">Avg +${avgYoY.toFixed(0)}% across catalog</div></div>`;
 }
 
 function drawSparkline(canvas, data, color) {
@@ -1204,21 +1204,22 @@ function renderCards() {
 }
 
 function renderRiskGrid() {
-  const filtered = activeProduct==='all' ? state : state.filter(m=>m.productLabels.includes(activeProduct));
+  const filtered = (activeProduct==='all' ? state : state.filter(m=>m.productLabels.includes(activeProduct))).filter(m => !m._hidden);
   const cats = [...new Set(filtered.map(m=>m.cat))];
   const labels={memory:'Memory',metals:'Metals',semicon:'Semicon',displays:'Display',payment:'Payment',plastics:'Plastics',thermal:'Thermal',networking:'Network',power:'Power'};
+  const maxCatYoY = Math.max(...cats.map(c => { const items=filtered.filter(m=>m.cat===c); return items.reduce((a,m)=>a+m.yoy,0)/items.length; }), 10);
   document.getElementById('riskGrid').innerHTML = cats.slice(0,6).map(c=>{
     const items=filtered.filter(m=>m.cat===c);
     const avgYoY=items.reduce((a,m)=>a+m.yoy,0)/items.length;
-    const pct=Math.min(Math.abs(avgYoY)/100*100,100);
+    const pct=Math.min(Math.abs(avgYoY)/maxCatYoY*100,100);
     const color=catColor(c);
-    const level=avgYoY>50?'CRITICAL':avgYoY>20?'HIGH':avgYoY>5?'MEDIUM':'LOW';
-    return `<div class="risk-cell"><div class="r-label">${labels[c]||c}</div><div class="r-value" style="color:${color}">${level}</div><div class="r-bar"><div class="r-fill" style="width:${pct}%;background:${color};box-shadow:0 0 6px ${color}40"></div></div></div>`;
+    const level=avgYoY>100?'CRITICAL':avgYoY>30?'HIGH':avgYoY>10?'MEDIUM':'LOW';
+    return `<div class="risk-cell"><div class="r-label">${labels[c]||c}</div><div class="r-value" style="color:${color}">${level} +${avgYoY.toFixed(0)}%</div><div class="r-bar"><div class="r-fill" style="width:${pct}%;background:${color};box-shadow:0 0 6px ${color}40"></div></div></div>`;
   }).join('');
 }
 
 function renderLeaderboard() {
-  const filtered = activeProduct==='all' ? state : state.filter(m=>m.productLabels.includes(activeProduct));
+  const filtered = (activeProduct==='all' ? state : state.filter(m=>m.productLabels.includes(activeProduct))).filter(m => !m._hidden);
   const sorted=[...filtered].sort((a,b)=>Math.abs(b.yoy)-Math.abs(a.yoy)).slice(0,8);
   const ranks=['gold','silver','bronze'];
   document.getElementById('leaderboard').innerHTML = sorted.map((m,i)=>{
@@ -1264,25 +1265,30 @@ function renderSources() {
 
 function renderRamageddon() {
   const ramSyms = ['DDR4','DDR5','NAND','SSD256','SSD512','SSD1T','HDD1T','HDD2T','EMMC'];
-  const ramMats = state.filter(m => ramSyms.includes(m.sym));
+  const ramMats = state.filter(m => ramSyms.includes(m.sym) && !m._hidden).sort((a,b) => b.yoy - a.yoy);
   if (!ramMats.length) { document.getElementById('ramageddon').style.display='none'; return; }
   document.getElementById('ramageddon').style.display='block';
 
   const avgYoY = ramMats.reduce((a,m)=>a+m.yoy,0)/ramMats.length;
-  const level = avgYoY > 80 ? 'DEFCON 1' : avgYoY > 50 ? 'DEFCON 2' : avgYoY > 25 ? 'ELEVATED' : 'WATCH';
+  const level = avgYoY > 200 ? 'DEFCON 1' : avgYoY > 100 ? 'DEFCON 2' : avgYoY > 50 ? 'ELEVATED' : 'WATCH';
 
+  // Dynamic news items pulled from actual data
+  const topDRAM = ramMats.find(m => m.sym === 'DDR4' || m.sym === 'DDR5');
+  const nandMat = ramMats.find(m => m.sym === 'NAND');
+  const ddr5Mat = ramMats.find(m => m.sym === 'DDR5');
+  const ssdMat = ramMats.find(m => m.sym === 'SSD1T') || ramMats.find(m => m.sym === 'SSD512');
   const newsItems = [
-    `<strong>DRAM CRISIS:</strong> DDR4 spot prices +171% YoY. AI infrastructure consuming global capacity.`,
-    `<strong>NAND SOLD OUT:</strong> Every manufacturer at capacity through 2026. Samsung weighing 20-30% additional hikes.`,
-    `<strong>DDR5 4x SURGE:</strong> Prices quadrupled since Sep 2025. POS terminal builds directly impacted.`,
-    `<strong>SSD SHORTAGE:</strong> Consumer/enterprise NAND deprioritized. OEM wholesale doubled since late 2025.`,
+    topDRAM ? `<strong>DRAM CRISIS:</strong> ${topDRAM.sym} +${topDRAM.yoy}% YoY. AI infrastructure consuming global capacity.` : null,
+    nandMat ? `<strong>NAND SOLD OUT:</strong> +${nandMat.yoy}% YoY. Every manufacturer at capacity. Samsung weighing further hikes.` : null,
+    ddr5Mat ? `<strong>DDR5 SURGE:</strong> +${ddr5Mat.yoy}% YoY. POS terminal builds directly impacted.` : null,
+    ssdMat ? `<strong>SSD SHORTAGE:</strong> ${ssdMat.sym} +${ssdMat.yoy}% YoY. OEM wholesale prices surging.` : null,
     `<strong>LEAD TIMES:</strong> Memory module allocation tightening. Recommend 6-month forward purchasing.`,
     `<strong>AI IMPACT:</strong> Data center DRAM demand cannibalizing consumer supply. No relief expected until 2027.`,
-  ];
+  ].filter(Boolean);
 
   let html = `<div class="rama-header">
     <div class="rama-title">RAMAGEDDON</div>
-    <div class="rama-subtitle">Memory & Storage Crisis Monitor // DDR4 \u2022 DDR5 \u2022 NAND \u2022 SSD \u2022 HDD</div>
+    <div class="rama-subtitle">Memory & Storage Crisis Monitor // Avg +${avgYoY.toFixed(0)}% YoY across ${ramMats.length} items</div>
     <div class="rama-badge extreme">${level}</div>
   </div>
   <div class="rama-grid">`;
