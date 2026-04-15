@@ -200,6 +200,7 @@
   @keyframes ramaPulse{0%,100%{box-shadow:0 0 8px rgba(255,51,102,0.2)}50%{box-shadow:0 0 20px rgba(255,51,102,0.5)}}
   .rama-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:12px 28px 16px}
   .rama-card{background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.15);border-radius:8px;padding:12px;position:relative;overflow:hidden}
+  .rama-card:hover{border-color:var(--purple);transform:translateY(-1px);box-shadow:0 4px 16px rgba(168,85,247,.15)}
   .rama-card::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--purple),transparent)}
   .rama-card .rc-sym{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--purple)}
   .rama-card .rc-name{font-size:10px;color:var(--muted);margin-bottom:6px}
@@ -395,6 +396,36 @@
   .kiosk-alert-item .ka-text{color:var(--text)}
   .kiosk-alert-item .ka-text strong{color:var(--cyan)}
   @keyframes kioskAlertScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  /* ============ MATERIAL DETAIL MODAL ============ */
+  .detail-overlay{display:none;position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px}
+  .detail-overlay.open{display:flex}
+  .detail-modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:900px;max-height:90vh;overflow-y:auto;padding:0;position:relative;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+  .detail-close{position:absolute;top:12px;right:16px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;z-index:2;padding:4px 10px;border-radius:6px}
+  .detail-close:hover{color:var(--text);background:rgba(255,255,255,.05)}
+  .detail-top{padding:24px 28px 16px;border-bottom:1px solid var(--border)}
+  .detail-sym{font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:2px;color:var(--cyan);margin-bottom:4px}
+  .detail-name{font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px}
+  .detail-stats{display:flex;gap:20px;flex-wrap:wrap;align-items:baseline}
+  .detail-price{font-family:'Orbitron',sans-serif;font-size:32px;font-weight:700;color:var(--text)}
+  .detail-unit{font-size:13px;color:var(--muted)}
+  .detail-yoy{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;padding:4px 12px;border-radius:6px}
+  .detail-yoy.up{color:var(--red);background:rgba(255,51,102,.1)}
+  .detail-yoy.down{color:var(--green);background:rgba(0,255,136,.1)}
+  .detail-chart-wrap{padding:20px 28px 12px;height:320px;position:relative}
+  .detail-canvas{width:100%;height:100%}
+  .detail-months{display:flex;justify-content:space-between;padding:0 28px 8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)}
+  .detail-info{padding:16px 28px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .detail-info-item{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);line-height:1.6}
+  .detail-info-item strong{color:var(--text);display:block;font-size:10px;letter-spacing:1px;margin-bottom:2px}
+  .detail-note{padding:0 28px 20px;font-size:12px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border);padding-top:16px}
+  .detail-note em{color:var(--yellow);font-style:normal}
+  .detail-table{padding:0 28px 20px}
+  .detail-table table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:11px}
+  .detail-table th{text-align:left;color:var(--cyan);font-size:9px;letter-spacing:1px;padding:6px 8px;border-bottom:1px solid var(--border)}
+  .detail-table td{padding:6px 8px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)}
+  .detail-table .mo-change.up{color:var(--red)}
+  .detail-table .mo-change.down{color:var(--green)}
 
   /* Kiosk indicator — bottom bar */
   body.kiosk .kiosk-indicator{display:flex}
@@ -702,6 +733,19 @@
 </div>
 </div>
 
+<!-- Material Detail Modal -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-modal" id="detailModal">
+    <button class="detail-close" id="detailClose">&times;</button>
+    <div class="detail-top" id="detailTop"></div>
+    <div class="detail-chart-wrap"><canvas class="detail-canvas" id="detailCanvas"></canvas></div>
+    <div class="detail-months" id="detailMonths"></div>
+    <div class="detail-table" id="detailTable"></div>
+    <div class="detail-info" id="detailInfo"></div>
+    <div class="detail-note" id="detailNote"></div>
+  </div>
+</div>
+
 <script>
 // ================================================================
 //  MATERIAL KNOWLEDGE BASE — April 2026 real-world pricing
@@ -709,24 +753,27 @@
 // ================================================================
 const ALL_MATERIALS = [
   // MEMORY & STORAGE — history: 13 monthly prices May 2025 → Apr 2026
-  { sym:'DDR4', name:'DDR4 8GB Module', cat:'memory', unit:'$/module', base:82, yoy:171, trend:'up', source:'TrendForce', impact:'high', note:'Spot ~$33.56/chip. AI demand consuming capacity. +2,200% surge.',
-    history:[30, 29, 28, 30, 35, 42, 48, 55, 60, 65, 72, 78, 82] },
-  { sym:'DDR5', name:'DDR5 16GB Module', cat:'memory', unit:'$/module', base:195, yoy:120, trend:'up', source:'TrendForce', impact:'high', note:'Prices quadrupled since Sep 2025. Kit avg ~$529/32GB.',
-    history:[89, 86, 84, 88, 95, 108, 125, 140, 155, 168, 180, 190, 195] },
-  { sym:'NAND', name:'NAND Flash TLC', cat:'memory', unit:'$/GB', base:0.055, yoy:85, trend:'up', source:'TrendForce', impact:'critical', note:'33-38% QoQ Q1 2026. Samsung mulling 20-30% more hikes. All mfrs sold out.',
-    history:[0.030, 0.029, 0.028, 0.029, 0.031, 0.034, 0.037, 0.040, 0.044, 0.048, 0.052, 0.054, 0.055] },
-  { sym:'SSD256', name:'SSD 256GB OEM', cat:'memory', unit:'$/unit', base:34, yoy:65, trend:'up', source:'StorageDiskPrices', impact:'high', note:'NAND allocated to AI/enterprise. Consumer deprioritized.',
-    history:[21, 20, 20, 21, 22, 24, 26, 28, 29, 31, 32, 33, 34] },
-  { sym:'SSD512', name:'SSD 512GB OEM', cat:'memory', unit:'$/unit', base:55, yoy:60, trend:'up', source:'StorageDiskPrices', impact:'high', note:'Wholesale $45-65 depending on volume.',
-    history:[34, 33, 33, 34, 36, 38, 41, 44, 46, 49, 52, 54, 55] },
-  { sym:'SSD1T', name:'SSD 1TB OEM', cat:'memory', unit:'$/unit', base:98, yoy:55, trend:'up', source:'StorageDiskPrices', impact:'high', note:'Consumer 1TB retail $109-218.',
-    history:[63, 62, 61, 63, 66, 70, 75, 80, 84, 89, 93, 96, 98] },
-  { sym:'HDD1T', name:'HDD 1TB Wholesale', cat:'memory', unit:'$/unit', base:38, yoy:15, trend:'up', source:'Seagate/Industry', impact:'medium', note:'$28.50-52 FOB. AI data center demand.',
-    history:[33, 33, 33, 34, 34, 35, 35, 36, 36, 37, 37, 38, 38] },
-  { sym:'HDD2T', name:'HDD 2TB Wholesale', cat:'memory', unit:'$/unit', base:58, yoy:12, trend:'up', source:'Seagate/Industry', impact:'medium', note:'Steady demand, moderate increases.',
-    history:[52, 52, 52, 53, 53, 54, 54, 55, 55, 56, 57, 57, 58] },
-  { sym:'EMMC', name:'eMMC 32GB Module', cat:'memory', unit:'$/unit', base:6.50, yoy:30, trend:'up', source:'Industry', impact:'medium', note:'Embedded storage for compact POS. NAND shortage affecting supply.',
-    history:[5.00, 4.90, 4.85, 5.00, 5.15, 5.30, 5.50, 5.70, 5.85, 6.00, 6.20, 6.40, 6.50] },
+  // DDR4/DDR5 YoY based on Tom's Hardware, TrendForce spot data, retail kit tracking
+  // NAND YoY based on Kingston 246% warning (Dec 2025) + Q1/Q2 2026 contract surges
+  // SSD YoY based on "doubled or tripled" per PC Gamer/Tom's Hardware
+  { sym:'DDR4', name:'DDR4 8GB Module', cat:'memory', unit:'$/module', base:82, yoy:447, trend:'up', source:'TrendForce', impact:'critical', note:'8GB modules ~$15 a year ago. AI demand starving consumer DRAM. 32GB kits $150-180.',
+    history:[15, 14.50, 14, 15, 18, 24, 32, 40, 48, 58, 68, 76, 82] },
+  { sym:'DDR5', name:'DDR5 16GB Module', cat:'memory', unit:'$/module', base:195, yoy:550, trend:'up', source:'TrendForce', impact:'critical', note:'32GB kits from ~$80 to $432+. 408% above Jul 2025 levels. HBM cannibalizing capacity.',
+    history:[30, 28, 27, 30, 38, 52, 72, 95, 120, 150, 175, 188, 195] },
+  { sym:'NAND', name:'NAND Flash TLC', cat:'memory', unit:'$/GB', base:0.055, yoy:310, trend:'up', source:'TrendForce', impact:'critical', note:'Kingston: +246% since Q1 2025. Q1 2026 +95% QoQ. Q2 forecast +75% QoQ. Samsung mulling 20-30% more.',
+    history:[0.0134, 0.0130, 0.0126, 0.0135, 0.0155, 0.0190, 0.0240, 0.0300, 0.0360, 0.0420, 0.0480, 0.0520, 0.055] },
+  { sym:'SSD256', name:'SSD 256GB OEM', cat:'memory', unit:'$/unit', base:34, yoy:143, trend:'up', source:'StorageDiskPrices', impact:'high', note:'NAND allocated to AI/enterprise. Popular drives doubled or tripled.',
+    history:[14, 13.50, 13, 14, 16, 19, 22, 25, 27, 30, 32, 33, 34] },
+  { sym:'SSD512', name:'SSD 512GB OEM', cat:'memory', unit:'$/unit', base:55, yoy:150, trend:'up', source:'StorageDiskPrices', impact:'high', note:'Wholesale $45-65. NAND wafer costs up 246% per Kingston.',
+    history:[22, 21, 20, 22, 25, 30, 35, 40, 44, 48, 52, 54, 55] },
+  { sym:'SSD1T', name:'SSD 1TB OEM', cat:'memory', unit:'$/unit', base:98, yoy:145, trend:'up', source:'StorageDiskPrices', impact:'high', note:'Consumer 1TB retail $109-218. Gen4 NVMe tripled from late 2024.',
+    history:[40, 38, 37, 40, 46, 54, 62, 70, 78, 86, 92, 96, 98] },
+  { sym:'HDD1T', name:'HDD 1TB Wholesale', cat:'memory', unit:'$/unit', base:38, yoy:27, trend:'up', source:'Seagate/Industry', impact:'medium', note:'$28.50-52 FOB. AI data center demand pulling supply.',
+    history:[30, 30, 29.50, 30, 31, 32, 33, 34, 35, 36, 37, 37.50, 38] },
+  { sym:'HDD2T', name:'HDD 2TB Wholesale', cat:'memory', unit:'$/unit', base:58, yoy:21, trend:'up', source:'Seagate/Industry', impact:'medium', note:'Steady demand. HDD benefiting from SSD price shock.',
+    history:[48, 48, 47.50, 48, 49, 50, 51, 52, 53, 55, 56, 57, 58] },
+  { sym:'EMMC', name:'eMMC 32GB Module', cat:'memory', unit:'$/unit', base:6.50, yoy:117, trend:'up', source:'Industry', impact:'high', note:'Embedded storage for compact POS. NAND shortage hitting all flash.',
+    history:[3.00, 2.90, 2.85, 3.00, 3.30, 3.70, 4.10, 4.50, 4.90, 5.40, 5.90, 6.20, 6.50] },
 
   // METALS
   { sym:'CU', name:'Copper', cat:'metals', unit:'$/lb', base:5.75, yoy:31.8, trend:'up', source:'LME', impact:'high', note:'+31.76% YoY. PCB traces, wiring, connectors.',
@@ -1241,7 +1288,7 @@ function renderRamageddon() {
   <div class="rama-grid">`;
 
   ramMats.slice(0,5).forEach(m => {
-    html += `<div class="rama-card">
+    html += `<div class="rama-card" data-sym="${m.sym}" style="cursor:pointer">
       <div class="rc-sym">${m.sym} <span class="rc-name">${m.name}</span></div>
       <div class="rc-row"><span class="rc-price">${fmt(m.price)}</span><span style="font-size:10px;color:var(--muted)">${m.unit}</span><span class="rc-yoy">\u25B2 ${m.yoy}% YoY</span></div>
       <div class="rc-note">${m.note}</div>
@@ -1470,16 +1517,147 @@ function renderAll(includeOutlook) {
   if (includeOutlook) renderOutlook();
 }
 
-// Card click for detail
-document.addEventListener('click', e=>{
-  const card=e.target.closest('.material-card');if(!card)return;
-  const sym=card.dataset.sym;const m=state.find(s=>s.sym===sym);if(!m)return;
-  const existing=card.querySelector('.card-tooltip');if(existing){existing.remove();return}
-  const tip=document.createElement('div');tip.className='card-tooltip';
-  tip.style.cssText='padding:10px;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:11px;line-height:1.6;color:var(--muted)';
-  tip.innerHTML=`<div style="color:var(--text);font-weight:600;margin-bottom:4px">${m.name} \u2014 Intelligence</div><div>${m.note}</div><div style="margin-top:6px;font-size:10px;opacity:.7">Source: ${m.source} \u2022 Impact: ${m.impact.toUpperCase()} \u2022 YoY: ${m.yoy>0?'+':''}${m.yoy}%</div>${m.productLabels.length?`<div style="margin-top:6px;font-size:10px;color:var(--cyan)">Affects: ${m.productLabels.join(', ')}</div>`:''}`;
-  card.appendChild(tip);
+// Card click — open detail modal with full trend chart
+const detailOverlay = document.getElementById('detailOverlay');
+const detailClose = document.getElementById('detailClose');
+
+function drawDetailChart(canvas, data, color) {
+  const dpr = window.devicePixelRatio || 1;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.offsetWidth * dpr;
+  const h = canvas.height = canvas.offsetHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const dw = canvas.offsetWidth, dh = canvas.offsetHeight;
+  ctx.clearRect(0, 0, dw, dh);
+
+  const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
+  const padT = 30, padB = 10, chartH = dh - padT - padB;
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(dw, y); ctx.stroke();
+  }
+
+  // Price labels on left
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '11px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  for (let i = 0; i <= 4; i++) {
+    const val = max - (range / 4) * i;
+    const y = padT + (chartH / 4) * i;
+    ctx.fillText(val >= 100 ? val.toFixed(0) : val >= 1 ? val.toFixed(2) : val.toFixed(4), 4, y - 4);
+  }
+
+  // Area fill
+  const grad = ctx.createLinearGradient(0, padT, 0, dh);
+  grad.addColorStop(0, color + '30'); grad.addColorStop(1, color + '00');
+  ctx.beginPath(); ctx.moveTo(0, dh);
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * dw;
+    const y = padT + chartH - ((v - min) / range) * chartH;
+    ctx.lineTo(x, y);
+  });
+  ctx.lineTo(dw, dh); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * dw;
+    const y = padT + chartH - ((v - min) / range) * chartH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.stroke();
+
+  // Data points
+  data.forEach((v, i) => {
+    const x = (i / (data.length - 1)) * dw;
+    const y = padT + chartH - ((v - min) / range) * chartH;
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = i === data.length - 1 ? color : 'var(--bg2)';
+    ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  });
+
+  // Last point glow
+  const lx = dw, ly = padT + chartH - ((data[data.length - 1] - min) / range) * chartH;
+  ctx.beginPath(); ctx.arc(lx, ly, 8, 0, Math.PI * 2);
+  ctx.fillStyle = color + '40'; ctx.fill();
+}
+
+function openDetail(sym) {
+  const m = state.find(s => s.sym === sym);
+  if (!m) return;
+  const color = catColor(m.cat);
+  const costUp = m.yoy >= 0;
+  const months = ['May 25','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan 26','Feb','Mar','Apr 26'];
+
+  // Top section
+  document.getElementById('detailTop').innerHTML = `
+    <div class="detail-sym">${m.sym} &mdash; ${m.cat.toUpperCase()}</div>
+    <div class="detail-name">${m.name}</div>
+    <div class="detail-stats">
+      <span class="detail-price">${fmt(m.price)}</span>
+      <span class="detail-unit">${m.unit}</span>
+      <span class="detail-yoy ${costUp ? 'up' : 'down'}">${costUp ? '\u25B2 +' : '\u25BC '}${m.yoy}% YoY</span>
+    </div>`;
+
+  // Month labels
+  document.getElementById('detailMonths').innerHTML = months.map(mo => `<span>${mo}</span>`).join('');
+
+  // Monthly data table
+  let tableHtml = '<table><thead><tr><th>MONTH</th><th>PRICE</th><th>MoM CHANGE</th></tr></thead><tbody>';
+  const fullMonths = ['May 2025','Jun 2025','Jul 2025','Aug 2025','Sep 2025','Oct 2025','Nov 2025','Dec 2025','Jan 2026','Feb 2026','Mar 2026','Apr 2026'];
+  // history has 13 points (includes prior month baseline); display last 12 with changes
+  for (let i = 1; i < m.history.length; i++) {
+    const prev = m.history[i - 1];
+    const cur = m.history[i];
+    const pctChange = ((cur - prev) / prev * 100);
+    const changeUp = pctChange >= 0;
+    tableHtml += `<tr>
+      <td>${fullMonths[i - 1]}</td>
+      <td>${cur >= 100 ? cur.toFixed(0) : cur >= 1 ? cur.toFixed(2) : cur.toFixed(4)} ${m.unit}</td>
+      <td class="mo-change ${changeUp ? 'up' : 'down'}">${changeUp ? '+' : ''}${pctChange.toFixed(1)}%</td>
+    </tr>`;
+  }
+  tableHtml += '</tbody></table>';
+  document.getElementById('detailTable').innerHTML = tableHtml;
+
+  // Info grid
+  const priorPrice = m.history[0];
+  document.getElementById('detailInfo').innerHTML = `
+    <div class="detail-info-item"><strong>SOURCE</strong>${m.source}</div>
+    <div class="detail-info-item"><strong>IMPACT</strong>${m.impact.toUpperCase()}</div>
+    <div class="detail-info-item"><strong>TREND</strong>${m.trend === 'up' ? '\u2191 Rising' : m.trend === 'down' ? '\u2193 Falling' : '\u2192 Stable'}</div>
+    <div class="detail-info-item"><strong>12MO AGO</strong>${priorPrice >= 100 ? priorPrice.toFixed(0) : priorPrice >= 1 ? priorPrice.toFixed(2) : priorPrice.toFixed(4)} ${m.unit}</div>
+    ${m.productLabels.length ? `<div class="detail-info-item" style="grid-column:1/-1"><strong>AFFECTS PRODUCTS</strong>${m.productLabels.join(', ')}</div>` : ''}`;
+
+  // Note
+  document.getElementById('detailNote').innerHTML = `<em>Intel:</em> ${m.note}`;
+
+  // Show overlay and draw chart
+  detailOverlay.classList.add('open');
+  // Defer chart draw so canvas has dimensions
+  requestAnimationFrame(() => {
+    const canvas = document.getElementById('detailCanvas');
+    drawDetailChart(canvas, m.history, color);
+  });
+}
+
+function closeDetail() {
+  detailOverlay.classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  const card = e.target.closest('.material-card') || e.target.closest('.rama-card[data-sym]');
+  if (card && card.dataset.sym) { openDetail(card.dataset.sym); return; }
 });
+
+detailClose.addEventListener('click', closeDetail);
+detailOverlay.addEventListener('click', e => { if (e.target === detailOverlay) closeDetail(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && detailOverlay.classList.contains('open')) closeDetail(); });
 
 // Tick simulation — threshold-based alerts
 const thresholdFired = new Set(); // track which materials already fired to avoid spam
