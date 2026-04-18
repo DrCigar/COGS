@@ -102,6 +102,12 @@
   .score-card.yellow .value{color:var(--yellow)}.score-card.yellow::after{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
   .score-card.purple .value{color:var(--purple)}.score-card.purple::after{background:var(--purple);box-shadow:0 0 10px var(--purple)}
   .score-card.orange .value{color:var(--orange)}.score-card.orange::after{background:var(--orange);box-shadow:0 0 10px var(--orange)}
+  .score-card.gold{background:linear-gradient(135deg,rgba(255,215,0,.12),rgba(255,180,0,.06),rgba(255,215,0,.12));border-top:1px solid rgba(255,215,0,.3)}
+  .score-card.gold .value{color:#ffd700;text-shadow:0 0 20px rgba(255,215,0,.6)}
+  .score-card.gold::after{background:linear-gradient(90deg,transparent,#ffd700,transparent);box-shadow:0 0 16px rgba(255,215,0,.5);animation:goldPulse 2s ease-in-out infinite}
+  .score-card.gold::before{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.08) 50%,transparent 60%);animation:goldSheen 3s ease-in-out infinite}
+  @keyframes goldPulse{0%,100%{opacity:.6}50%{opacity:1}}
+  @keyframes goldSheen{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
 
   /* FILTER BAR */
   .filter-bar{display:flex;align-items:center;gap:8px;padding:10px 28px;border-bottom:1px solid var(--border);background:var(--bg2);flex-wrap:wrap}
@@ -1153,11 +1159,12 @@ function renderScoreBar() {
   const falling = filtered.length - rising;
   const avgYoY = filtered.reduce((a,m)=>a+m.yoy,0)/filtered.length||0;
 
+  const allClear = criticals === 0 && highImpact === 0 && avgYoY <= 5;
   document.getElementById('scoreBar').innerHTML = `
     <div class="score-card purple"><div class="label">Avg YoY Change</div><div class="value">${avgYoY>=0?'+':''}${avgYoY.toFixed(1)}%</div><div class="detail">${filtered.length} materials tracked</div></div>
     <div class="score-card cyan"><div class="label">YoY Breadth</div><div class="value">${rising} \u2191 / ${falling} \u2193</div><div class="detail">${rising>falling?'Majority rising YoY':'Mixed or declining'}</div></div>
-    <div class="score-card ${criticals>0?'red':'yellow'}"><div class="label">Risk Items</div><div class="value">${criticals}C / ${highImpact}H</div><div class="detail">${criticals} critical, ${highImpact} high</div></div>
-    <div class="score-card ${avgYoY>50?'red':avgYoY>20?'yellow':'green'}"><div class="label">Supply Chain Risk</div><div class="value">${avgYoY>50?'CRITICAL':avgYoY>20?'ELEVATED':avgYoY>5?'MODERATE':'NORMAL'}</div><div class="detail">Avg +${avgYoY.toFixed(0)}% across catalog</div></div>`;
+    <div class="score-card ${allClear?'gold':criticals>0?'red':'yellow'}"><div class="label">Risk Items</div><div class="value">${allClear?'\u2605 CLEAR':criticals+'C / '+highImpact+'H'}</div><div class="detail">${allClear?'No critical or high risk items':criticals+' critical, '+highImpact+' high'}</div></div>
+    <div class="score-card ${allClear?'gold':avgYoY>50?'red':avgYoY>20?'yellow':'green'}"><div class="label">Supply Chain Risk</div><div class="value">${allClear?'\u2605 OPTIMAL':avgYoY>50?'CRITICAL':avgYoY>20?'ELEVATED':avgYoY>5?'MODERATE':'NORMAL'}</div><div class="detail">${allClear?'All categories in normal range':'Avg +'+avgYoY.toFixed(0)+'% across catalog'}</div></div>`;
 }
 
 function drawSparkline(canvas, data, color) {
