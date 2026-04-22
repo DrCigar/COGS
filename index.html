@@ -487,7 +487,7 @@
     <div style="font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:1px;margin-top:2px;opacity:.6">developed by LOVEANDNATE</div>
   </div>
   <div class="header-right">
-    <div class="market-status open">PRICES UPDATED: APR 21, 2026</div>
+    <div class="market-status open">PRICES UPDATED: APR 22, 2026</div>
     <div class="clock" id="clock">00:00:00</div>
     <button class="settings-btn" id="exportBtn" title="Export CSV">DOWNLOAD</button>
     <button class="settings-btn" id="settingsBtn" title="Settings">SETTINGS</button>
@@ -763,8 +763,8 @@ const ALL_MATERIALS = [
   // DDR4/DDR5 YoY based on Tom's Hardware, TrendForce spot data, retail kit tracking
   // NAND YoY based on Kingston 246% warning (Dec 2025) + Q1/Q2 2026 contract surges
   // SSD YoY based on "doubled or tripled" per PC Gamer/Tom's Hardware
-  { sym:'DDR4', name:'DDR4 8GB Module', cat:'memory', unit:'$/module', base:80, yoy:433, trend:'up', source:'TrendForce', impact:'critical', note:'8GB modules ~$15 a year ago. AI demand starving consumer DRAM. 32GB kits $150-180. Slight spot softening Apr/May.',
-    history:[15, 14.50, 14, 15, 18, 24, 32, 40, 48, 58, 68, 76, 82, 80] },
+  { sym:'DDR4', name:'DDR4 16GB Module', cat:'memory', unit:'$/module', base:160, yoy:433, trend:'up', source:'TrendForce', impact:'critical', note:'16GB modules ~$30 a year ago. AI demand starving consumer DRAM. Spot softening slightly but contract prices surging Q2.',
+    history:[30, 29, 28, 30, 36, 48, 64, 80, 96, 116, 136, 152, 164, 160] },
   { sym:'DDR5', name:'DDR5 16GB Module', cat:'memory', unit:'$/module', base:200, yoy:567, trend:'up', source:'TrendForce', impact:'critical', note:'32GB kits $432+. HBM cannibalizing capacity. Q2 contract pricing still surging. May spot $200.',
     history:[30, 28, 27, 30, 38, 52, 72, 95, 120, 150, 175, 188, 195, 200] },
   { sym:'NAND', name:'NAND Flash TLC', cat:'memory', unit:'$/GB', base:0.067, yoy:400, trend:'up', source:'TrendForce', impact:'critical', note:'Q2 2026 +75% QoQ per TrendForce. Q1 was +95% QoQ. Enterprise/AI allocations blocking consumer supply.',
