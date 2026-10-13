@@ -519,6 +519,74 @@
   .detail-note em{color:var(--gray)}
   .detail-overlay{backdrop-filter:none}
   .kiosk-indicator{color:var(--gray);background:var(--bg2);border-color:var(--border)}
+  /* ---- Breathing room ---- */
+  .ticker-wrap{height:36px}
+  .ticker-wrap::before,.ticker-wrap::after{width:120px}
+  .ticker-wrap::before{background:linear-gradient(90deg,var(--bg2),transparent)}
+  .ticker-wrap::after{background:linear-gradient(90deg,transparent,var(--bg2))}
+  .ticker-item{gap:10px;padding:0 28px;border-right:none;font-size:12px}
+  .ticker-item .change{min-width:0;text-align:left}
+  .header{padding:24px 40px 24px 46px}
+  .rama-news{display:none}
+  .rama-header{padding:24px 40px 0}
+  .rama-grid{gap:16px;padding:18px 40px 26px}
+  .rama-card{padding:16px 18px}
+  .rama-card .rc-note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:11px;line-height:1.5;margin-top:8px}
+  .master-chart-section{padding:28px 40px 24px}
+  .master-chart-title,.outlook-title{margin-bottom:22px}
+  .master-chart{gap:20px}
+  .outlook-section{padding:28px 40px 32px}
+  .outlook-header{margin-bottom:20px}
+  .outlook-header .outlook-title{margin-bottom:0}
+  .outlook-legend{gap:22px;font-size:11px}
+  .outlook-grid{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:20px}
+  .outlook-card{padding:20px 22px;display:flex;flex-direction:column}
+  .oc-top{margin-bottom:16px}
+  .oc-cat{font-size:14px}
+  .oc-sentiment-label{font-size:10px;padding:4px 10px}
+  .oc-gauge{height:6px;margin-bottom:8px}
+  .oc-gauge-marker{width:14px;height:14px;top:-4px}
+  .oc-gauge-labels{font-size:9px;margin-bottom:14px;letter-spacing:.5px}
+  .oc-intel{font-size:12px;line-height:1.6;margin-bottom:16px;flex:1}
+  .oc-meta{font-size:11px;padding-top:12px;border-top:1px solid var(--border)}
+  .oc-yoy-vs{gap:10px}
+  .score-card{padding:20px 28px}
+  .score-card .label{margin-bottom:8px}
+  .filter-bar{padding:16px 40px;gap:10px}
+  .prod-chip{padding:14px 22px}
+  .cards-area{padding:24px 28px;gap:18px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+  .material-card{padding:20px}
+  .card-header{margin-bottom:14px}
+  .card-chart{margin:14px -4px 10px}
+  .card-products{margin-top:12px;padding-top:12px}
+  .sidebar-section{padding:24px}
+  .sidebar-title{margin-bottom:16px}
+  .risk-grid{gap:10px}
+  .leader-row{padding:9px 0}
+  .alert-feed{padding:24px}
+  .sources-bar{padding:12px 40px}
+  .kiosk-indicator{bottom:16px}
+  body.kiosk .kiosk-indicator{animation:kioskHint 6s ease forwards}
+  @keyframes kioskHint{0%,70%{opacity:.8}100%{opacity:0;visibility:hidden}}
+  /* Kiosk: fewer, bigger things */
+  body.kiosk .header{padding:12px 32px 12px 38px}
+  body.kiosk .ramageddon{padding:0 !important;max-height:none}
+  body.kiosk .rama-header{padding:14px 32px 0}
+  body.kiosk .rama-grid{padding:12px 32px 16px;gap:14px}
+  body.kiosk .rama-card{padding:10px 14px}
+  body.kiosk .master-chart-section{padding:20px 32px 12px !important}
+  body.kiosk .master-chart-title{margin-bottom:8px}
+  body.kiosk .master-chart{gap:24px}
+  body.kiosk .outlook-section{padding:18px 32px 22px !important;max-height:none}
+  body.kiosk .outlook-header{margin-bottom:14px}
+  body.kiosk .outlook-grid{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  body.kiosk .outlook-card{padding:12px 14px}
+  body.kiosk .oc-top{flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:12px}
+  body.kiosk .oc-cat{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  body.kiosk .oc-sentiment-label{font-size:9px;padding:3px 8px}
+  body.kiosk .oc-gauge{height:6px}
+  body.kiosk .score-bar{padding:0;max-height:none}
+  body.kiosk .score-card{padding:14px 32px}
   body.kiosk .brand-logo{height:34px}
   body.kiosk .header-titles{padding-left:16px}
   @media(max-width:768px){.brand-logo{height:30px}.header{flex-wrap:wrap;gap:10px;padding:14px 16px 14px 22px}.header-left{gap:12px}.header-titles{padding-left:12px}.header-right{flex-wrap:wrap;gap:10px}}
@@ -785,7 +853,7 @@
 </div>
 
 <!-- Kiosk mode indicator -->
-<div class="kiosk-indicator" id="kioskIndicator">KIOSK MODE \u2022 Press ESC to exit</div>
+<div class="kiosk-indicator" id="kioskIndicator">Kiosk mode &bull; Press Esc to exit</div>
 
 <div class="ramageddon" id="ramageddon" style="display:none"></div>
 <div class="master-chart-section" id="masterChartSection" style="display:none">
@@ -820,10 +888,6 @@
 
 <div class="sources-bar" id="sources"></div>
 
-<div class="kiosk-alerts" id="kioskAlerts">
-  <div class="kiosk-alerts-label">&#9889; ALERTS</div>
-  <div class="kiosk-alerts-track" id="kioskAlertsTrack"></div>
-</div>
 </div>
 
 <!-- Material Detail Modal -->
@@ -1237,11 +1301,9 @@ function renderTicker() {
     const cls = costUp ? 'up' : 'down'; // up=red(bad), down=green(good)
     const arrow = costUp ? '\u25B2' : '\u25BC';
     const sign = costUp ? '+' : '';
-    return `<div class="ticker-item">
+    return `<div class="ticker-item" title="${m.name}: ${fmt(m.price)} ${m.unit}">
       <span class="sym">${m.sym}</span>
-      <span style="color:var(--muted);font-size:10px">${m.name}</span>
-      <span>${fmt(m.price)} <span style="color:var(--muted)">${m.unit}</span></span>
-      <span class="change ${cls}">${arrow} ${sign}${m.yoy.toFixed(1)}% YoY</span>
+      <span class="change ${cls}">${arrow} ${sign}${m.yoy.toFixed(0)}%</span>
     </div>`;
   }).join('');
 }
@@ -1536,7 +1598,7 @@ function renderOutlook() {
 
     html += `<div class="outlook-card" data-cat="${cat}">
       <div class="oc-top">
-        <div class="oc-cat">${emoji} ${catLabels[cat] || cat}</div>
+        <div class="oc-cat">${catLabels[cat] || cat}</div>
         <div class="oc-sentiment-label ${s.cls}">${s.text}</div>
       </div>
       <div class="oc-gauge">
